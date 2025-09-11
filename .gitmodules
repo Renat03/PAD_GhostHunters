@@ -1,0 +1,3 @@
+[submodule "microservices/inventory-service"]
+	path = microservices/inventory-service
+	url = https://github.com/Renat03/inventory-service.git
