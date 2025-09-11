@@ -7,3 +7,6 @@
 [submodule "microservices/chat-service"]
 	path = microservices/chat-service
 	url = https://github.com/Renat03/chat-service.git
+[submodule "microservices/journal-service"]
+	path = microservices/journal-service
+	url = https://github.com/Bostan-Victor/journal-service.git
