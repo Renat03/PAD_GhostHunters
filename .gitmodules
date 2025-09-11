@@ -13,3 +13,6 @@
 [submodule "microservices/ghost-ai-service"]
 	path = microservices/ghost-ai-service
 	url = https://github.com/gEoNNNN/Ghost-AI-Service
+[submodule "microservices/User-Management-Service"]
+	path = microservices/User-Management-Service
+	url = https://github.com/gEoNNNN/User-Management-Service
