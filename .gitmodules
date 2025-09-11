@@ -10,3 +10,6 @@
 [submodule "microservices/journal-service"]
 	path = microservices/journal-service
 	url = https://github.com/Bostan-Victor/journal-service.git
+[submodule "microservices/ghost-ai-service"]
+	path = microservices/ghost-ai-service
+	url = https://github.com/gEoNNNN/Ghost-AI-Service
