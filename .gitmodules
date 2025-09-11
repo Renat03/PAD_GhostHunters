@@ -16,3 +16,6 @@
 [submodule "microservices/User-Management-Service"]
 	path = microservices/User-Management-Service
 	url = https://github.com/gEoNNNN/User-Management-Service
+[submodule "microservices/user-management-service"]
+	path = microservices/user-management-service
+	url = https://github.com/gEoNNNN/User-Management-Service
