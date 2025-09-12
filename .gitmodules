@@ -19,3 +19,6 @@
 [submodule "microservices/user-management-service"]
 	path = microservices/user-management-service
 	url = https://github.com/gEoNNNN/User-Management-Service
+[submodule "microservices/lobby-service"]
+	path = microservices/lobby-service
+	url = https://github.com/Doschinescu/lobby-service.git
