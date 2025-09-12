@@ -10,3 +10,24 @@
 [submodule "microservices/journal-service"]
 	path = microservices/journal-service
 	url = https://github.com/Bostan-Victor/journal-service.git
+[submodule "microservices/ghost-ai-service"]
+	path = microservices/ghost-ai-service
+	url = https://github.com/gEoNNNN/Ghost-AI-Service
+[submodule "microservices/User-Management-Service"]
+	path = microservices/User-Management-Service
+	url = https://github.com/gEoNNNN/User-Management-Service
+[submodule "microservices/user-management-service"]
+	path = microservices/user-management-service
+	url = https://github.com/gEoNNNN/User-Management-Service
+[submodule "microservices/lobby-service"]
+	path = microservices/lobby-service
+	url = https://github.com/Doschinescu/lobby-service.git
+[submodule "microservices/map-service"]
+	path = microservices/map-service
+	url = https://github.com/Doschinescu/map-service.git
+[submodule "microservices/ghost-service"]
+	path = microservices/ghost-service
+	url = https://github.com/Sergiu12121/ghost-service
+[submodule "microservices/location-service"]
+	path = microservices/location-service
+	url = https://github.com/Sergiu12121/location-service
