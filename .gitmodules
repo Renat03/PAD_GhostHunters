@@ -22,3 +22,6 @@
 [submodule "microservices/lobby-service"]
 	path = microservices/lobby-service
 	url = https://github.com/Doschinescu/lobby-service.git
+[submodule "microservices/map-service"]
+	path = microservices/map-service
+	url = https://github.com/Doschinescu/map-service.git
