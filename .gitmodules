@@ -25,3 +25,6 @@
 [submodule "microservices/location-service"]
 	path = microservices/location-service
 	url = https://github.com/Sergiu12121/location-service
+[submodule "microservices/chat-service"]
+	path = microservices/chat-service
+	url = https://github.com/Renat03/chat-service.git
