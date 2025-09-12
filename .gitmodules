@@ -25,3 +25,9 @@
 [submodule "microservices/map-service"]
 	path = microservices/map-service
 	url = https://github.com/Doschinescu/map-service.git
+[submodule "microservices/ghost-service"]
+	path = microservices/ghost-service
+	url = https://github.com/Sergiu12121/ghost-service
+[submodule "microservices/location-service"]
+	path = microservices/location-service
+	url = https://github.com/Sergiu12121/location-service
