@@ -28,3 +28,6 @@
 [submodule "microservices/chat-service"]
 	path = microservices/chat-service
 	url = https://github.com/Renat03/chat-service.git
+[submodule "microservices/inventory-service"]
+	path = microservices/inventory-service
+	url = https://github.com/Renat03/inventory-service.git
