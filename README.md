@@ -367,13 +367,20 @@ This section enumerates all endpoints across all services and defines the data t
 
 ---
 
-## User Management Service
-Handles user profiles, authentication, and currency management.    
-**Database:** PostgreSQL  
+# User Management Service – Full API Documentation (Updated)
 
-### Endpoints
+Handles user profiles, authentication, currency management, and social connections.
+
+**Database:** PostgreSQL
+
+---
+
+## Endpoints
+
+### 1. User Registration & Authentication
 
 #### POST /users/register
+
 **Request**
 ```json
 {
@@ -392,7 +399,10 @@ Handles user profiles, authentication, and currency management.
 }
 ```
 
+---
+
 #### POST /users/login
+
 **Request**
 ```json
 {
@@ -409,7 +419,12 @@ Handles user profiles, authentication, and currency management.
 }
 ```
 
+---
+
+### 2. Profile Management
+
 #### GET /users/{userId}/profile
+
 **Response**
 ```json
 {
@@ -421,7 +436,32 @@ Handles user profiles, authentication, and currency management.
 }
 ```
 
+---
+
+#### PATCH /users/{userId}/profile
+
+**Request**
+```json
+{
+  "username": "string (optional)",
+  "email": "string (optional)",
+  "level": "int (optional)"
+}
+```
+**Response**
+```json
+{
+  "success": "bool",
+  "updatedFields": ["string"]
+}
+```
+
+---
+
+### 3. Currency Management
+
 #### POST /users/{userId}/currency/deduct
+
 **Request**
 ```json
 {
@@ -438,7 +478,33 @@ Handles user profiles, authentication, and currency management.
 }
 ```
 
+---
+
+#### POST /users/{userId}/currency/add
+
+**Request**
+```json
+{
+  "amount": "int",
+  "transactionId": "uuid",
+  "reason": "string"
+}
+```
+**Response**
+```json
+{
+  "success": "bool",
+  "newBalance": "int"
+}
+```
+*Description:* Increases the user's currency balance by the specified amount. Used for rewards, admin grants, etc.
+
+---
+
+### 4. Friend Management
+
 #### GET /users/{userId}/friends
+
 **Response**
 ```json
 {
@@ -454,6 +520,137 @@ Handles user profiles, authentication, and currency management.
 
 ---
 
+#### POST /users/{userId}/friends
+
+**Request**
+```json
+{
+  "friendId": "uuid"
+}
+```
+**Response**
+```json
+{
+  "success": "bool",
+  "friendshipStatus": "pending|accepted|already_friends|rejected",
+  "message": "string"
+}
+```
+*Description:* Initiates a friend request or creates a friendship link, depending on business logic.
+
+---
+
+#### POST /users/{userId}/friends/{friendId}/accept
+
+**Response**
+```json
+{
+  "success": "bool",
+  "message": "string"
+}
+```
+*Description:* Accepts a pending friend request from `friendId`.
+
+---
+
+#### DELETE /users/{userId}/friends/{friendId}
+
+**Response**
+```json
+{
+  "success": "bool",
+  "message": "string"
+}
+```
+*Description:* Removes a friend or cancels a pending friend request.
+
+---
+
+### 5. Token Operations
+
+#### POST /users/token/refresh
+
+**Request**
+```json
+{
+  "refreshToken": "string"
+}
+```
+**Response**
+```json
+{
+  "token": "jwt",
+  "expiresIn": "int"
+}
+```
+
+---
+
+### 6. Account Deletion
+
+#### DELETE /users/{userId}
+
+**Response**
+```json
+{
+  "success": "bool",
+  "message": "string"
+}
+```
+
+---
+
+## Event Schemas
+
+#### UserBalanceChanged Event
+```json
+{
+  "eventType": "UserBalanceChanged",
+  "timestamp": "2025-09-25T16:30:00Z",
+  "payload": {
+    "userId": "uuid",
+    "oldBalance": "int",
+    "newBalance": "int",
+    "change": "int",
+    "reason": "string",
+    "transactionId": "uuid"
+  }
+}
+```
+
+#### FriendRequest Event
+```json
+{
+  "eventType": "FriendRequest",
+  "timestamp": "2025-09-25T16:30:00Z",
+  "payload": {
+    "fromUserId": "uuid",
+    "toUserId": "uuid",
+    "status": "pending|accepted|rejected"
+  }
+}
+```
+
+---
+
+## Summary Table
+
+| Method | Path                                      | Description                        |
+|--------|-------------------------------------------|------------------------------------|
+| POST   | /users/register                           | Register new user                  |
+| POST   | /users/login                              | Login and receive JWT              |
+| GET    | /users/{userId}/profile                   | Get user profile                   |
+| PATCH  | /users/{userId}/profile                   | Update user profile                |
+| POST   | /users/{userId}/currency/deduct           | Deduct currency from user          |
+| POST   | /users/{userId}/currency/add              | **Increase currency (NEW)**        |
+| GET    | /users/{userId}/friends                   | List friends                       |
+| POST   | /users/{userId}/friends                   | **Send/request friend (NEW)**      |
+| POST   | /users/{userId}/friends/{friendId}/accept | Accept friend request              |
+| DELETE | /users/{userId}/friends/{friendId}        | Remove friend/cancel request       |
+| POST   | /users/token/refresh                      | Refresh access token               |
+| DELETE | /users/{userId}                           | Delete user account                |
+
+---
 ## Shop Service
 Handles item catalog, pricing, and purchase transactions.  
 **Database:** PostgreSQL  
