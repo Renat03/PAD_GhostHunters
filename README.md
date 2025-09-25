@@ -1229,4 +1229,54 @@ Our repository follows a structured GitHub workflow to ensure quality, collabora
   - **PATCH**: Bug fixes, small improvements.
 - Each release is tagged in GitHub (e.g., `v1.2.0`) and documented in the changelog.
 
+## Services on Docker Hub (public)
+Replace USERNAME and tags with your published images.
+
+- Shop Service
+  - Image: vain12/shop-service:1.0.0
+  - Swagger: http://localhost:5198/swagger
+  - Source: [microservices/shop-service/ShopService/Program.cs](microservices/shop-service/ShopService/Program.cs), docs: [microservices/shop-service/README.md](microservices/shop-service/README.md)
+- Journal Service
+  - Image: vain12/journal-service:1.0.0
+  - Swagger: http://localhost:5299/swagger
+  - Source: [microservices/journal-service/JournalService/Program.cs](microservices/journal-service/JournalService/Program.cs), docs: [microservices/journal-service/README.md](microservices/journal-service/README.md)
+
+## Requirements
+- Docker Desktop (or Docker Engine + Compose)
+- Host ports available:
+  - Shop: 5198 (service), 5432 (Postgres)
+  - Journal: 5299 (service), 5433 (Postgres)
+- Optional: .NET 8 SDK if running locally without Docker
+
+## Run with CPR Docker Compose
+Use the common compose to start both services with their databases and persistent volumes. This compose references Docker Hub images (no local Dockerfiles).
+
+1) From repo root, create .env from the template and set values (do not commit .env):
+   - Windows (CMD): copy .env.example .env
+   - PowerShell: Copy-Item .env.example .env
+   - Bash: cp .env.example .env
+2) Ensure images are set in .env:
+   - SHOP_IMAGE=USERNAME/shop-service:1.0.0
+   - JOURNAL_IMAGE=USERNAME/journal-service:1.0.0
+3) Start:
+   - docker compose -f docker-compose.cpr.yml --env-file .env up -d
+
+- Compose file: [docker-compose.cpr.yml](docker-compose.cpr.yml)
+- DB init scripts:
+  - Shop: [microservices/shop-service/db/init.sql](microservices/shop-service/db/init.sql)
+  - Journal: [microservices/journal-service/db/init.sql](microservices/journal-service/db/init.sql)
+
+## Endpoint Summary (see service READMEs for full contracts)
+- Shop Service (base http://localhost:5198)
+  - GET /shop/items
+  - GET /shop/items/{itemId}
+  - POST /shop/purchase
+  - GET /shop/items/{itemId}/price-history
+  - Full contract: [microservices/shop-service/README.md](microservices/shop-service/README.md)
+- Journal Service (base http://localhost:5299)
+  - POST /journal/observations
+  - POST /journal/guess
+  - GET /journal/lobbies/{lobbyId}/evaluation
+  - Full contract: [microservices/journal-service/README.md](microservices/journal-service/README.md)
+
 
