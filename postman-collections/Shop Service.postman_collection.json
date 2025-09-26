@@ -1,0 +1,94 @@
+{
+	"info": {
+		"_postman_id": "c3e626fb-b2ad-44c1-93bb-fd900c640082",
+		"name": "Shop Service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "29711462",
+		"_collection_link": "https://blue-comet-816408.postman.co/workspace/My-Workspace~e3a68dcf-2e2f-414d-84d2-710be9b837e2/collection/29754674-c3e626fb-b2ad-44c1-93bb-fd900c640082?action=share&source=collection_link&creator=29711462"
+	},
+	"item": [
+		{
+			"name": "Get List Items",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5198/shop/items",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5198",
+					"path": [
+						"shop",
+						"items"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Item By ID",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5198/shop/items/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5198",
+					"path": [
+						"shop",
+						"items",
+						"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Purchase",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5198/shop/purchase",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5198",
+					"path": [
+						"shop",
+						"purchase"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get Price History",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5198/shop/items/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa/price-history",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5198",
+					"path": [
+						"shop",
+						"items",
+						"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+						"price-history"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

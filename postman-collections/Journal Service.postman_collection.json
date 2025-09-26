@@ -1,0 +1,109 @@
+{
+	"info": {
+		"_postman_id": "e5317b15-8e6e-4868-9e78-34a2a5675f64",
+		"name": "Journal Service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "29711462",
+		"_collection_link": "https://blue-comet-816408.postman.co/workspace/My-Workspace~e3a68dcf-2e2f-414d-84d2-710be9b837e2/collection/29711462-e5317b15-8e6e-4868-9e78-34a2a5675f64?action=share&source=collection_link&creator=29711462"
+	},
+	"item": [
+		{
+			"name": "Create Observation",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userId\": \"00000000-0000-0000-0000-000000000001\",\r\n  \"lobbyId\": \"11111111-1111-1111-1111-111111111111\",\r\n  \"observation\": {\r\n    \"symptom\": \"emf\",\r\n    \"description\": \"spiked near kitchen\",\r\n    \"confidence\": \"high\"\r\n  }\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5299/journal/observations",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5299",
+					"path": [
+						"journal",
+						"observations"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Submit Guess",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n  \"userId\": \"00000000-0000-0000-0000-000000000009\",\r\n  \"lobbyId\": \"22222222-2222-2222-2222-222222222222\",\r\n  \"guessedGhostType\": \"Banshee\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5299/journal/guess",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5299",
+					"path": [
+						"journal",
+						"guess"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Evaluate Lobby",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Accept",
+						"value": "application/json",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:5299/journal/lobbies/22222222-2222-2222-2222-222222222222/evaluation",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5299",
+					"path": [
+						"journal",
+						"lobbies",
+						"22222222-2222-2222-2222-222222222222",
+						"evaluation"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

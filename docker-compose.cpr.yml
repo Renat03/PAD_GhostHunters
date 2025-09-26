@@ -1,0 +1,73 @@
+version: "3.9"
+
+services:
+  shop-postgres:
+    image: postgres:16
+    container_name: cpr-shop-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${SHOP_POSTGRES_DB}
+      POSTGRES_USER: ${SHOP_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD}
+    ports:
+      - "${SHOP_POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - cpr_shop_pgdata:/var/lib/postgresql/data
+      - ./microservices/shop-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHOP_POSTGRES_USER} -d ${SHOP_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  shop-service:
+    image: ${SHOP_IMAGE}
+    container_name: cpr-shop-service
+    depends_on:
+      shop-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+    ports:
+      - "5198:8080"
+
+  journal-postgres:
+    image: postgres:16
+    container_name: cpr-journal-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${JOURNAL_POSTGRES_DB}
+      POSTGRES_USER: ${JOURNAL_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_PASSWORD}
+    ports:
+      # use 5433 on host to avoid clash with shop DB
+      - "${JOURNAL_POSTGRES_PORT:-5433}:5432"
+    volumes:
+      - cpr_journal_pgdata:/var/lib/postgresql/data
+      - ./microservices/journal-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${JOURNAL_POSTGRES_USER} -d ${JOURNAL_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  journal-service:
+    image: ${JOURNAL_IMAGE}
+    container_name: cpr-journal-service
+    depends_on:
+      journal-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+      ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+    ports:
+      - "5299:8080"
+
+volumes:
+  cpr_shop_pgdata:
+  cpr_journal_pgdata:
