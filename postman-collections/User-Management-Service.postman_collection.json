@@ -1,0 +1,226 @@
+{
+  "info": {
+    "name": "User Management Service",
+    "description": "API collection for testing the User Management Service endpoints",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johndoe\",\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "register"]
+            },
+            "description": "Registers a new user account"
+          },
+          "response": []
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"john@example.com\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "login"]
+            },
+            "description": "Authenticates a user and returns a JWT token"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Profile Management",
+      "item": [
+        {
+          "name": "Get User Profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "profile"]
+            },
+            "description": "Retrieves the profile data for a specific user"
+          },
+          "response": []
+        },
+        {
+          "name": "Update User Profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"johnsmith\",\n  \"level\": 5\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "profile"]
+            },
+            "description": "Updates user profile information"
+          },
+          "response": []
+        },
+        {
+          "name": "Delete User Account",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}"]
+            },
+            "description": "Deletes a user account and all related data"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Currency Management",
+      "item": [
+        {
+          "name": "Deduct Currency",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 50,\n  \"transactionId\": \"txn-123\",\n  \"reason\": \"Equipment purchase\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/currency/deduct",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "currency", "deduct"]
+            },
+            "description": "Deducts currency from a user's account"
+          },
+          "response": []
+        },
+        {
+          "name": "Add Currency",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"amount\": 100,\n  \"transactionId\": \"reward-456\",\n  \"reason\": \"Level completion reward\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/currency/add",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "currency", "add"]
+            },
+            "description": "Adds currency to a user's account"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Friends Management",
+      "item": [
+        {
+          "name": "Get User Friends",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/friends",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "friends"]
+            },
+            "description": "Retrieves the friend list for a user"
+          },
+          "response": []
+        },
+        {
+          "name": "Send Friend Request",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"friendId\": \"{{friendUserId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/users/{{userId}}/friends",
+              "host": ["{{baseUrl}}"],
+              "path": ["users", "{{userId}}", "friends"]
+            },
+            "description": "Sends a friend request to another user"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3001",
+      "type": "string"
+    },
+    {
+      "key": "userId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "friendUserId",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}
