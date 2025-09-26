@@ -1,0 +1,150 @@
+{
+	"info": {
+		"_postman_id": "585d5839-892a-4475-badc-4cf3fb9a8025",
+		"name": "Chat Service",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "28918324"
+	},
+	"item": [
+		{
+			"name": "New Request",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"messageId\": \"8aa85f44-5717-4562-b3fc-2c963f66afa6\",\n  \"roomId\": \"6fa85f64-5717-4562-b3fc-2c963f66afa6\",\n  \"fromUserId\": \"5fa85f64-5717-4562-b3fc-2c963f66afa6\",\n  \"fromUsername\": \"q\",\n  \"content\": \"asd\",\n  \"messageType\": \"text\",\n  \"timestamp\": \"2025-09-26T01:48:45.685Z\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5046/api/Chat/messages",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5046",
+					"path": [
+						"api",
+						"Chat",
+						"messages"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5046/api/Chat/rooms/6fa85f64-5717-4562-b3fc-2c963f66afa6/messages",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5046",
+					"path": [
+						"api",
+						"Chat",
+						"rooms",
+						"6fa85f64-5717-4562-b3fc-2c963f66afa6",
+						"messages"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5046/api/Chat/users/5fa85f64-5717-4562-b3fc-2c963f66afa6/messages",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5046",
+					"path": [
+						"api",
+						"Chat",
+						"users",
+						"5fa85f64-5717-4562-b3fc-2c963f66afa6",
+						"messages"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "\"5fa85f64-5717-4562-b3fc-2c963f66afa6\"",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5046/api/Chat/rooms/6fa85f64-5717-4562-b3fc-2c963f66afa6/join",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5046",
+					"path": [
+						"api",
+						"Chat",
+						"rooms",
+						"6fa85f64-5717-4562-b3fc-2c963f66afa6",
+						"join"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "New Request",
+			"request": {
+				"method": "PUT",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "false",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5046/api/Chat/rooms/6fa85f64-5717-4562-b3fc-2c963f66afa6/haunting",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5046",
+					"path": [
+						"api",
+						"Chat",
+						"rooms",
+						"6fa85f64-5717-4562-b3fc-2c963f66afa6",
+						"haunting"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
