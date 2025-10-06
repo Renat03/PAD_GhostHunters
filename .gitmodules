@@ -31,3 +31,7 @@
 [submodule "microservices/inventory-service"]
 	path = microservices/inventory-service
 	url = https://github.com/Renat03/inventory-service.git
+[submodule "microservices/gateway-service"]
+	path = microservices/gateway-service
+	url = https://github.com/Bostan-Victor/gateway-service.git
+	branch = main
