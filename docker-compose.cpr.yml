@@ -1,6 +1,7 @@
 version: "3.9"
 
 services:
+  # === Databases (no changes) ===
   shop-postgres:
     image: postgres:16
     container_name: cpr-shop-postgres
@@ -9,30 +10,17 @@ services:
       POSTGRES_DB: ${SHOP_POSTGRES_DB}
       POSTGRES_USER: ${SHOP_POSTGRES_USER}
       POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD}
-    ports:
-      - "${SHOP_POSTGRES_PORT:-5432}:5432"
     volumes:
       - cpr_shop_pgdata:/var/lib/postgresql/data
       - ./microservices/shop-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    command: ["postgres", "-c", "log_statement=all", "-c", "log_min_duration_statement=0"]
+    networks:
+      - cpr-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${SHOP_POSTGRES_USER} -d ${SHOP_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
-
-  shop-service:
-    image: ${SHOP_IMAGE}
-    container_name: cpr-shop-service
-    depends_on:
-      shop-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-    ports:
-      - "5198:8080"
 
   journal-postgres:
     image: postgres:16
@@ -42,20 +30,164 @@ services:
       POSTGRES_DB: ${JOURNAL_POSTGRES_DB}
       POSTGRES_USER: ${JOURNAL_POSTGRES_USER}
       POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_PASSWORD}
-    ports:
-      # use 5433 on host to avoid clash with shop DB
-      - "${JOURNAL_POSTGRES_PORT:-5433}:5432"
     volumes:
       - cpr_journal_pgdata:/var/lib/postgresql/data
       - ./microservices/journal-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+    command: ["postgres", "-c", "log_statement=all", "-c", "log_min_duration_statement=0"]
+    networks:
+      - cpr-network
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${JOURNAL_POSTGRES_USER} -d ${JOURNAL_POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
+  ghost-postgres:
+    image: postgres:16
+    container_name: cpr-ghost-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${GHOST_POSTGRES_USER:-ghostuser}
+      POSTGRES_PASSWORD: ${GHOST_POSTGRES_PASSWORD:-ghostpass}
+      POSTGRES_DB: ${GHOST_POSTGRES_DB:-ghostdb}
+    volumes:
+      - cpr_ghost_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GHOST_POSTGRES_USER:-ghostuser} -d ${GHOST_POSTGRES_DB:-ghostdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chat-postgres:
+    image: postgres:16
+    container_name: cpr-chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${CHAT_POSTGRES_DB:-chatdb}
+      POSTGRES_USER: ${CHAT_POSTGRES_USER:-chatuser}
+      POSTGRES_PASSWORD: ${CHAT_POSTGRES_PASSWORD:-chatpass}
+    volumes:
+      - cpr_chat_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CHAT_POSTGRES_USER:-chatuser} -d ${CHAT_POSTGRES_DB:-chatdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  inventory-postgres:
+    image: postgres:16
+    container_name: cpr-inventory-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${INVENTORY_POSTGRES_DB:-inventorydb}
+      POSTGRES_USER: ${INVENTORY_POSTGRES_USER:-inventoryuser}
+      POSTGRES_PASSWORD: ${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+    volumes:
+      - cpr_inventory_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_POSTGRES_USER:-inventoryuser} -d ${INVENTORY_POSTGRES_DB:-inventorydb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  lobby-mongodb:
+    image: mongo:7.0
+    container_name: cpr-lobby-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${LOBBY_MONGO_USER:-lobbyadmin}
+      MONGO_INITDB_ROOT_PASSWORD: ${LOBBY_MONGO_PASSWORD:-lobbypass}
+      MONGO_INITDB_DATABASE: ${LOBBY_MONGO_DB:-lobbydb}
+    volumes:
+      - cpr_lobby_mongodb:/data/db
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  map-mongodb:
+    image: mongo:7.0
+    container_name: cpr-map-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MAP_MONGO_USER:-mapadmin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MAP_MONGO_PASSWORD:-mappass}
+      MONGO_INITDB_DATABASE: ${MAP_MONGO_DB:-mapdb}
+    volumes:
+      - cpr_map_mongodb:/data/db
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  user-mongodb:
+    image: mongo:7.0
+    container_name: cpr-user-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${USER_MONGO_USER:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${USER_MONGO_PASSWORD:-admin123}
+      MONGO_INITDB_DATABASE: ${USER_MONGO_DB:-user_management}
+    volumes:
+      - cpr_user_mongodb:/data/db
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ghost-ai-mongodb:
+    image: mongo:7-jammy
+    container_name: cpr-ghost-ai-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${GHOST_AI_MONGO_USER:-ghostadmin}
+      MONGO_INITDB_ROOT_PASSWORD: ${GHOST_AI_MONGO_PASSWORD:-ghostpass123}
+      MONGO_INITDB_DATABASE: ${GHOST_AI_MONGO_DB:-ghostai}
+    volumes:
+      - cpr_ghost_ai_mongodb:/data/db
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # === Services ===
+  shop-service:
+    image: ${SHOP_IMAGE:-vain12/shop-service}
+    container_name: cpr-shop-service
+    depends_on:
+      shop-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
   journal-service:
-    image: ${JOURNAL_IMAGE}
+    image: ${JOURNAL_IMAGE:-vain12/journal-service}
     container_name: cpr-journal-service
     depends_on:
       journal-postgres:
@@ -65,9 +197,195 @@ services:
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
       ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  ghost-service:
+    image: ${GHOST_IMAGE:-sergiudimbitchi/ghost-service-ts}
+    container_name: cpr-ghost-service
+    depends_on:
+      ghost-postgres:
+        condition: service_healthy
+    environment:
+      PORT: "8000"
+      NODE_ENV: "production"
+      STORAGE_BACKEND: "postgres"
+      DATABASE_URL: "postgres://${GHOST_POSTGRES_USER:-ghostuser}:${GHOST_POSTGRES_PASSWORD:-ghostpass}@ghost-postgres:5432/${GHOST_POSTGRES_DB:-ghostdb}"
+    expose:
+      - "8000"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  ghost-ai-service:
+    image: ${GHOST_AI_IMAGE:-eugenostafi/ghost-ai-service}
+    container_name: cpr-ghost-ai-service
+    depends_on:
+      ghost-ai-mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+      MONGODB_URI: mongodb://${GHOST_AI_MONGO_USER:-ghostadmin}:${GHOST_AI_MONGO_PASSWORD:-ghostpass123}@ghost-ai-mongodb:27017/${GHOST_AI_MONGO_DB:-ghostai}?authSource=admin
+    expose:
+      - "3002"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  user-management-service:
+    image: ${USER_IMAGE:-eugenostafi/user-management-service}
+    container_name: cpr-user-management-service
+    depends_on:
+      user-mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      MONGODB_URI: mongodb://${USER_MONGO_USER:-admin}:${USER_MONGO_PASSWORD:-admin123}@user-mongodb:27017/${USER_MONGO_DB:-user_management}?authSource=admin
+    expose:
+      - "3001"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === NEW SERVICES - FIXED WITH expose ===
+  
+  lobby-service:
+    image: ${LOBBY_IMAGE:-doschinescu/lobby-service}
+    container_name: cpr-lobby-service
+    depends_on:
+      lobby-mongodb:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${LOBBY_MONGO_USER:-lobbyadmin}:${LOBBY_MONGO_PASSWORD:-lobbypass}@lobby-mongodb:27017/${LOBBY_MONGO_DB:-lobbydb}?authSource=admin
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  map-service:
+    image: ${MAP_IMAGE:-doschinescu/map-service}
+    container_name: cpr-map-service
+    depends_on:
+      map-mongodb:
+        condition: service_healthy
+    environment:
+      PORT: "8081"
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${MAP_MONGO_USER:-mapadmin}:${MAP_MONGO_PASSWORD:-mappass}@map-mongodb:27017/${MAP_MONGO_DB:-mapdb}?authSource=admin
+    expose:
+      - "8081"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  chat-service:
+    image: ${CHAT_IMAGE:-renat03/chat-service}
+    container_name: cpr-chat-service
+    depends_on:
+      chat-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=chat-postgres;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  inventory-service:
+    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
+    container_name: cpr-inventory-service
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=inventory-postgres;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  location-service:
+    image: ${LOCATION_IMAGE:-sergiudimbitchi/location-service}
+    container_name: cpr-location-service
+    environment:
+      PORT: "8001"
+      NODE_ENV: production
+    expose:
+      - "8001"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  gateway-service:
+    build:
+      context: ./microservices/gateway-service
+      dockerfile: Dockerfile
+    container_name: cpr-gateway-service
+    depends_on:
+      - shop-service
+      - journal-service
+      - ghost-service
+      - ghost-ai-service
+      - user-management-service
+      - lobby-service
+      - map-service
+      - chat-service
+      - inventory-service
+      - location-service
+    environment:
+      PORT: "8080"
+      SHOP_BASE_URL: "http://shop-service:8080"
+      JOURNAL_BASE_URL: "http://journal-service:8080"
+      GHOST_BASE_URL: "http://ghost-service:8000"
+      GHOST_AI_BASE_URL: "http://ghost-ai-service:3002"
+      USER_BASE_URL: "http://user-management-service:3001"
+      LOBBY_BASE_URL: "http://lobby-service:8080"
+      MAP_BASE_URL: "http://map-service:8081"
+      CHAT_BASE_URL: "http://chat-service:8080"
+      INVENTORY_BASE_URL: "http://inventory-service:8080"
+      LOCATION_BASE_URL: "http://location-service:8001"
     ports:
-      - "5299:8080"
+      - "${GATEWAY_PORT:-8081}:8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   cpr_shop_pgdata:
   cpr_journal_pgdata:
+  cpr_ghost_pgdata:
+  cpr_chat_pgdata:
+  cpr_inventory_pgdata:
+  cpr_lobby_mongodb:
+  cpr_map_mongodb:
+  cpr_user_mongodb:
+  cpr_ghost_ai_mongodb:
+
+networks:
+  cpr-network:
+    driver: bridge
