@@ -616,6 +616,7 @@ services:
     platform: linux/amd64
     container_name: cpr-gateway-service
     depends_on:
+      - service-discovery
       - shop-service-1
       - journal-service-1
       - ghost-service-1
@@ -638,6 +639,7 @@ services:
       CHAT_BASE_URL: "http://chat-service-1:8080"
       INVENTORY_BASE_URL: "http://inventory-service-1:8080"
       LOCATION_BASE_URL: "http://location-service-1:8001"
+      SERVICE_DISCOVERY_URL: "http://service-discovery:8000"
     ports:
       - "${GATEWAY_PORT:-8081}:8080"
     networks:
@@ -645,6 +647,25 @@ services:
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # === SERVICE DISCOVERY ===
+  service-discovery:
+    build:
+      context: ./microservices/service-discovery
+      dockerfile: Dockerfile
+    container_name: cpr-service-discovery
+    environment:
+      PORT: "8000"
+    ports:
+      - "8000:8000"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
