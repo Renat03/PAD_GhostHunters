@@ -35,3 +35,6 @@
 	path = microservices/gateway-service
 	url = https://github.com/Bostan-Victor/gateway-service.git
 	branch = main
+[submodule "microservices/service-discovery"]
+	path = microservices/service-discovery
+	url = https://github.com/vain12/service-discovery.git
