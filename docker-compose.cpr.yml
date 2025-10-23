@@ -1,9 +1,11 @@
 version: "3.9"
 
 services:
-  # === Databases (no changes) ===
+  # === Databases ===
+  
   shop-postgres:
     image: postgres:16
+    platform: linux/amd64
     container_name: cpr-shop-postgres
     restart: unless-stopped
     environment:
@@ -24,6 +26,7 @@ services:
 
   journal-postgres:
     image: postgres:16
+    platform: linux/amd64
     container_name: cpr-journal-postgres
     restart: unless-stopped
     environment:
@@ -44,6 +47,7 @@ services:
 
   ghost-postgres:
     image: postgres:16
+    platform: linux/amd64
     container_name: cpr-ghost-postgres
     restart: unless-stopped
     environment:
@@ -62,6 +66,7 @@ services:
 
   chat-postgres:
     image: postgres:16
+    platform: linux/amd64
     container_name: cpr-chat-postgres
     restart: unless-stopped
     environment:
@@ -80,6 +85,7 @@ services:
 
   inventory-postgres:
     image: postgres:16
+    platform: linux/amd64
     container_name: cpr-inventory-postgres
     restart: unless-stopped
     environment:
@@ -98,6 +104,7 @@ services:
 
   lobby-mongodb:
     image: mongo:7.0
+    platform: linux/amd64
     container_name: cpr-lobby-mongodb
     restart: unless-stopped
     environment:
@@ -116,6 +123,7 @@ services:
 
   map-mongodb:
     image: mongo:7.0
+    platform: linux/amd64
     container_name: cpr-map-mongodb
     restart: unless-stopped
     environment:
@@ -134,6 +142,7 @@ services:
 
   user-mongodb:
     image: mongo:7.0
+    platform: linux/amd64
     container_name: cpr-user-mongodb
     restart: unless-stopped
     environment:
@@ -152,6 +161,7 @@ services:
 
   ghost-ai-mongodb:
     image: mongo:7-jammy
+    platform: linux/amd64
     container_name: cpr-ghost-ai-mongodb
     restart: unless-stopped
     environment:
@@ -168,10 +178,11 @@ services:
       timeout: 10s
       retries: 3
 
-  # === Services ===
-  shop-service:
+  # === SCALED SHOP SERVICE (3 replicas) ===
+  shop-service-1:
     image: ${SHOP_IMAGE:-vain12/shop-service}
-    container_name: cpr-shop-service
+    platform: linux/amd64
+    container_name: cpr-shop-service-1
     depends_on:
       shop-postgres:
         condition: service_healthy
@@ -186,9 +197,47 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  journal-service:
+  shop-service-2:
+    image: ${SHOP_IMAGE:-vain12/shop-service}
+    platform: linux/amd64
+    container_name: cpr-shop-service-2
+    depends_on:
+      shop-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  shop-service-3:
+    image: ${SHOP_IMAGE:-vain12/shop-service}
+    platform: linux/amd64
+    container_name: cpr-shop-service-3
+    depends_on:
+      shop-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED JOURNAL SERVICE (3 replicas) ===
+  journal-service-1:
     image: ${JOURNAL_IMAGE:-vain12/journal-service}
-    container_name: cpr-journal-service
+    platform: linux/amd64
+    container_name: cpr-journal-service-1
     depends_on:
       journal-postgres:
         condition: service_healthy
@@ -203,9 +252,47 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  ghost-service:
+  journal-service-2:
+    image: ${JOURNAL_IMAGE:-vain12/journal-service}
+    platform: linux/amd64
+    container_name: cpr-journal-service-2
+    depends_on:
+      journal-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+      ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  journal-service-3:
+    image: ${JOURNAL_IMAGE:-vain12/journal-service}
+    platform: linux/amd64
+    container_name: cpr-journal-service-3
+    depends_on:
+      journal-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+      ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED GHOST SERVICE (2 replicas) - NO PLATFORM CONSTRAINT ===
+  ghost-service-1:
     image: ${GHOST_IMAGE:-sergiudimbitchi/ghost-service-ts}
-    container_name: cpr-ghost-service
+    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
+    container_name: cpr-ghost-service-1
     depends_on:
       ghost-postgres:
         condition: service_healthy
@@ -226,9 +313,35 @@ services:
       retries: 3
       start_period: 40s
 
-  ghost-ai-service:
+  ghost-service-2:
+    image: ${GHOST_IMAGE:-sergiudimbitchi/ghost-service-ts}
+    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
+    container_name: cpr-ghost-service-2
+    depends_on:
+      ghost-postgres:
+        condition: service_healthy
+    environment:
+      PORT: "8000"
+      NODE_ENV: "production"
+      STORAGE_BACKEND: "postgres"
+      DATABASE_URL: "postgres://${GHOST_POSTGRES_USER:-ghostuser}:${GHOST_POSTGRES_PASSWORD:-ghostpass}@ghost-postgres:5432/${GHOST_POSTGRES_DB:-ghostdb}"
+    expose:
+      - "8000"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # === SCALED GHOST AI SERVICE (2 replicas) ===
+  ghost-ai-service-1:
     image: ${GHOST_AI_IMAGE:-eugenostafi/ghost-ai-service}
-    container_name: cpr-ghost-ai-service
+    platform: linux/amd64
+    container_name: cpr-ghost-ai-service-1
     depends_on:
       ghost-ai-mongodb:
         condition: service_healthy
@@ -242,9 +355,28 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  user-management-service:
+  ghost-ai-service-2:
+    image: ${GHOST_AI_IMAGE:-eugenostafi/ghost-ai-service}
+    platform: linux/amd64
+    container_name: cpr-ghost-ai-service-2
+    depends_on:
+      ghost-ai-mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+      MONGODB_URI: mongodb://${GHOST_AI_MONGO_USER:-ghostadmin}:${GHOST_AI_MONGO_PASSWORD:-ghostpass123}@ghost-ai-mongodb:27017/${GHOST_AI_MONGO_DB:-ghostai}?authSource=admin
+    expose:
+      - "3002"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED USER MANAGEMENT SERVICE (2 replicas) ===
+  user-management-service-1:
     image: ${USER_IMAGE:-eugenostafi/user-management-service}
-    container_name: cpr-user-management-service
+    platform: linux/amd64
+    container_name: cpr-user-management-service-1
     depends_on:
       user-mongodb:
         condition: service_healthy
@@ -258,11 +390,28 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  # === NEW SERVICES - FIXED WITH expose ===
-  
-  lobby-service:
+  user-management-service-2:
+    image: ${USER_IMAGE:-eugenostafi/user-management-service}
+    platform: linux/amd64
+    container_name: cpr-user-management-service-2
+    depends_on:
+      user-mongodb:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      MONGODB_URI: mongodb://${USER_MONGO_USER:-admin}:${USER_MONGO_PASSWORD:-admin123}@user-mongodb:27017/${USER_MONGO_DB:-user_management}?authSource=admin
+    expose:
+      - "3001"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED LOBBY SERVICE (2 replicas) ===
+  lobby-service-1:
     image: ${LOBBY_IMAGE:-doschinescu/lobby-service}
-    container_name: cpr-lobby-service
+    platform: linux/amd64
+    container_name: cpr-lobby-service-1
     depends_on:
       lobby-mongodb:
         condition: service_healthy
@@ -276,9 +425,28 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  map-service:
+  lobby-service-2:
+    image: ${LOBBY_IMAGE:-doschinescu/lobby-service}
+    platform: linux/amd64
+    container_name: cpr-lobby-service-2
+    depends_on:
+      lobby-mongodb:
+        condition: service_healthy
+    environment:
+      PORT: "8080"
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${LOBBY_MONGO_USER:-lobbyadmin}:${LOBBY_MONGO_PASSWORD:-lobbypass}@lobby-mongodb:27017/${LOBBY_MONGO_DB:-lobbydb}?authSource=admin
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED MAP SERVICE (2 replicas) ===
+  map-service-1:
     image: ${MAP_IMAGE:-doschinescu/map-service}
-    container_name: cpr-map-service
+    platform: linux/amd64
+    container_name: cpr-map-service-1
     depends_on:
       map-mongodb:
         condition: service_healthy
@@ -292,9 +460,28 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  chat-service:
+  map-service-2:
+    image: ${MAP_IMAGE:-doschinescu/map-service}
+    platform: linux/amd64
+    container_name: cpr-map-service-2
+    depends_on:
+      map-mongodb:
+        condition: service_healthy
+    environment:
+      PORT: "8081"
+      NODE_ENV: production
+      MONGODB_URI: mongodb://${MAP_MONGO_USER:-mapadmin}:${MAP_MONGO_PASSWORD:-mappass}@map-mongodb:27017/${MAP_MONGO_DB:-mapdb}?authSource=admin
+    expose:
+      - "8081"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED CHAT SERVICE (3 replicas) ===
+  chat-service-1:
     image: ${CHAT_IMAGE:-renat03/chat-service}
-    container_name: cpr-chat-service
+    platform: linux/amd64
+    container_name: cpr-chat-service-1
     depends_on:
       chat-postgres:
         condition: service_healthy
@@ -308,9 +495,45 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  inventory-service:
+  chat-service-2:
+    image: ${CHAT_IMAGE:-renat03/chat-service}
+    platform: linux/amd64
+    container_name: cpr-chat-service-2
+    depends_on:
+      chat-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=chat-postgres;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  chat-service-3:
+    image: ${CHAT_IMAGE:-renat03/chat-service}
+    platform: linux/amd64
+    container_name: cpr-chat-service-3
+    depends_on:
+      chat-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=chat-postgres;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED INVENTORY SERVICE (3 replicas) ===
+  inventory-service-1:
     image: ${INVENTORY_IMAGE:-renat03/inventory-service}
-    container_name: cpr-inventory-service
+    platform: linux/amd64
+    container_name: cpr-inventory-service-1
     depends_on:
       inventory-postgres:
         condition: service_healthy
@@ -324,9 +547,45 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  location-service:
+  inventory-service-2:
+    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
+    platform: linux/amd64
+    container_name: cpr-inventory-service-2
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=inventory-postgres;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  inventory-service-3:
+    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
+    platform: linux/amd64
+    container_name: cpr-inventory-service-3
+    depends_on:
+      inventory-postgres:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=inventory-postgres;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED LOCATION SERVICE (2 replicas) - NO PLATFORM CONSTRAINT ===
+  location-service-1:
     image: ${LOCATION_IMAGE:-sergiudimbitchi/location-service}
-    container_name: cpr-location-service
+    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
+    container_name: cpr-location-service-1
     environment:
       PORT: "8001"
       NODE_ENV: production
@@ -336,34 +595,49 @@ services:
       - cpr-network
     restart: unless-stopped
 
+  location-service-2:
+    image: ${LOCATION_IMAGE:-sergiudimbitchi/location-service}
+    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
+    container_name: cpr-location-service-2
+    environment:
+      PORT: "8001"
+      NODE_ENV: production
+    expose:
+      - "8001"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === Gateway Service ===
   gateway-service:
     build:
       context: ./microservices/gateway-service
       dockerfile: Dockerfile
+    platform: linux/amd64
     container_name: cpr-gateway-service
     depends_on:
-      - shop-service
-      - journal-service
-      - ghost-service
-      - ghost-ai-service
-      - user-management-service
-      - lobby-service
-      - map-service
-      - chat-service
-      - inventory-service
-      - location-service
+      - shop-service-1
+      - journal-service-1
+      - ghost-service-1
+      - ghost-ai-service-1
+      - user-management-service-1
+      - lobby-service-1
+      - map-service-1
+      - chat-service-1
+      - inventory-service-1
+      - location-service-1
     environment:
       PORT: "8080"
-      SHOP_BASE_URL: "http://shop-service:8080"
-      JOURNAL_BASE_URL: "http://journal-service:8080"
-      GHOST_BASE_URL: "http://ghost-service:8000"
-      GHOST_AI_BASE_URL: "http://ghost-ai-service:3002"
-      USER_BASE_URL: "http://user-management-service:3001"
-      LOBBY_BASE_URL: "http://lobby-service:8080"
-      MAP_BASE_URL: "http://map-service:8081"
-      CHAT_BASE_URL: "http://chat-service:8080"
-      INVENTORY_BASE_URL: "http://inventory-service:8080"
-      LOCATION_BASE_URL: "http://location-service:8001"
+      SHOP_BASE_URL: "http://shop-service-1:8080"
+      JOURNAL_BASE_URL: "http://journal-service-1:8080"
+      GHOST_BASE_URL: "http://ghost-service-1:8000"
+      GHOST_AI_BASE_URL: "http://ghost-ai-service-1:3002"
+      USER_BASE_URL: "http://user-management-service-1:3001"
+      LOBBY_BASE_URL: "http://lobby-service-1:8080"
+      MAP_BASE_URL: "http://map-service-1:8081"
+      CHAT_BASE_URL: "http://chat-service-1:8080"
+      INVENTORY_BASE_URL: "http://inventory-service-1:8080"
+      LOCATION_BASE_URL: "http://location-service-1:8001"
     ports:
       - "${GATEWAY_PORT:-8081}:8080"
     networks:
