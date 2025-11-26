@@ -38,3 +38,6 @@
 [submodule "microservices/service-discovery"]
 	path = microservices/service-discovery
 	url = https://github.com/vain12/service-discovery.git
+[submodule "microservices/message-broker"]
+	path = microservices/message-broker
+	url = https://github.com/Bostan-Victor/message-broker.git
