@@ -186,11 +186,15 @@ services:
     depends_on:
       shop-postgres:
         condition: service_healthy
+      message-broker:  # ← ADD THIS
+        condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
       ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      MESSAGE_BROKER_URL: http://message-broker:8002  # ← ADD THIS
+      SERVICE_NAME: shop-service-1  # ← ADD THIS
     expose:
       - "8080"
     networks:
@@ -204,11 +208,15 @@ services:
     depends_on:
       shop-postgres:
         condition: service_healthy
+      message-broker:  # ← ADD THIS
+        condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
       ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      MESSAGE_BROKER_URL: http://message-broker:8002  # ← ADD THIS
+      SERVICE_NAME: shop-service-2  # ← ADD THIS
     expose:
       - "8080"
     networks:
@@ -222,11 +230,15 @@ services:
     depends_on:
       shop-postgres:
         condition: service_healthy
+      message-broker:  # ← ADD THIS
+        condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
       SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
       ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
+      MESSAGE_BROKER_URL: http://message-broker:8002  # ← ADD THIS
+      SERVICE_NAME: shop-service-3  # ← ADD THIS
     expose:
       - "8080"
     networks:
@@ -669,6 +681,29 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+
+# === MESSAGE BROKER ===
+
+  message-broker:
+    build:
+      context: ./microservices/message-broker
+      dockerfile: Dockerfile
+    image: ${MESSAGE_BROKER_IMAGE:-vain12/message-broker:latest}
+    container_name: cpr-message-broker
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - LOG_LEVEL=INFO
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
 
 volumes:
   cpr_shop_pgdata:

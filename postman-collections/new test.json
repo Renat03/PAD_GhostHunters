@@ -1,0 +1,633 @@
+{
+  "info": {
+    "name": "Message Broker - Grade 3 Complete",
+    "description": "Complete Grade 3 demonstration: Thread-per-Request, Round-Robin, Circuit Breaker, Service-to-Service",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Health & Thread Stats",
+      "item": [
+        {
+          "name": "1.1 Root - Check Architecture",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/",
+              "host": ["{{broker_url}}"],
+              "path": [""]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.2 Health Check - Thread Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/health",
+              "host": ["{{broker_url}}"],
+              "path": ["health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "1.3 Comprehensive Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["stats"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Test thread-per-request architecture. Run 1.2 multiple times quickly to see active_threads increase."
+    },
+    {
+      "name": "2. Round-Robin Load Balancing",
+      "item": [
+        {
+          "name": "2.1 Register Shop Instance 1",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/register?service_name=shop&url=http://shop-service-1:8080",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "register"],
+              "query": [
+                {
+                  "key": "service_name",
+                  "value": "shop"
+                },
+                {
+                  "key": "url",
+                  "value": "http://shop-service-1:8080"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.2 Register Shop Instance 2",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/register?service_name=shop&url=http://shop-service-2:8080",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "register"],
+              "query": [
+                {
+                  "key": "service_name",
+                  "value": "shop"
+                },
+                {
+                  "key": "url",
+                  "value": "http://shop-service-2:8080"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.3 Register Shop Instance 3",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/register?service_name=shop&url=http://shop-service-3:8080",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "register"],
+              "query": [
+                {
+                  "key": "service_name",
+                  "value": "shop"
+                },
+                {
+                  "key": "url",
+                  "value": "http://shop-service-3:8080"
+                }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.4 Get Next Instance (Run 9x)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/shop/next",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "shop", "next"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "2.5 Load Balancer Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "stats"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Test Round-Robin: Register 3 instances, then run 2.4 nine times. Should cycle: 0→1→2→0→1→2→0→1→2"
+    },
+    {
+      "name": "3. Circuit Breaker",
+      "item": [
+        {
+          "name": "3.1 Check Initial State (All Healthy)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.2 Fail Instance-1 (Open Circuit)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/shop/1/fail",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "shop", "1", "fail"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.3 Check State After Failure",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.4 Get Next Instance (Run 6x - Should Skip 1)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/shop/next",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "shop", "next"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.5 Recover Instance-1 (Close Circuit)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/shop/1/recover",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "shop", "1", "recover"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.6 Check State After Recovery",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "stats"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "3.7 Get Next Instance (Run 3x - 1 Should Be Back)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/shop/next",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "shop", "next"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Test Circuit Breaker: Fail Instance-1, verify it's skipped (run 3.4 six times, should only see 0 and 2), then recover"
+    },
+    {
+      "name": "4. Service-to-Service Communication",
+      "item": [
+        {
+          "name": "4.1 Subscribe Inventory to shop.purchase",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"shop.purchase\",\n  \"subscriber_id\": \"inventory-service-1\",\n  \"service_name\": \"inventory\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/subscribe",
+              "host": ["{{broker_url}}"],
+              "path": ["subscribe"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.2 Subscribe Journal to shop.purchase",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"shop.purchase\",\n  \"subscriber_id\": \"journal-service-1\",\n  \"service_name\": \"journal\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/subscribe",
+              "host": ["{{broker_url}}"],
+              "path": ["subscribe"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.3 Get All Subscribers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/subscribers",
+              "host": ["{{broker_url}}"],
+              "path": ["subscribers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.4 Publish Purchase Event to Topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"shop.purchase\",\n  \"payload\": {\n    \"user_id\": \"user-123\",\n    \"item_id\": \"item-456\",\n    \"quantity\": 2,\n    \"total_cost\": 150,\n    \"timestamp\": \"2024-01-15T10:30:00Z\"\n  },\n  \"sender\": \"shop-service\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/publish/topic",
+              "host": ["{{broker_url}}"],
+              "path": ["publish", "topic"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.5 Get Messages for Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/messages/inventory-service-1",
+              "host": ["{{broker_url}}"],
+              "path": ["messages", "inventory-service-1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.6 Get Messages for Journal",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/messages/journal-service-1",
+              "host": ["{{broker_url}}"],
+              "path": ["messages", "journal-service-1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.7 Get Topic Subscribers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/topics/shop.purchase/subscribers",
+              "host": ["{{broker_url}}"],
+              "path": ["topics", "shop.purchase", "subscribers"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "4.8 Acknowledge Message (Inventory)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/acknowledge/inventory-service-1/{{message_id}}",
+              "host": ["{{broker_url}}"],
+              "path": ["acknowledge", "inventory-service-1", "{{message_id}}"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Test Service-to-Service: Subscribe 2 services, publish event, verify both receive it (subscribers_notified: 2)"
+    },
+    {
+      "name": "5. Request Forwarding (Gateway Integration)",
+      "item": [
+        {
+          "name": "5.1 Forward GET to Shop (List Items)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"GET\",\n  \"path\": \"/api/shop/items\",\n  \"headers\": {},\n  \"query_params\": {}\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "5.2 Forward POST to Shop (Purchase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"POST\",\n  \"path\": \"/api/shop/purchase\",\n  \"headers\": {\n    \"Content-Type\": \"application/json\"\n  },\n  \"body\": {\n    \"userId\": \"user-123\",\n    \"itemId\": 1,\n    \"quantity\": 2\n  }\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Test request forwarding with load balancing. Run 5.1 or 5.2 multiple times to see different instance_ids"
+    },
+    {
+      "name": "6. Topics Management",
+      "item": [
+        {
+          "name": "6.1 Get All Topics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/topics",
+              "host": ["{{broker_url}}"],
+              "path": ["topics"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "6.2 Get Subscribers for Topic",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/topics/shop.purchase/subscribers",
+              "host": ["{{broker_url}}"],
+              "path": ["topics", "shop.purchase", "subscribers"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "7. Direct Publishing (Gateway-to-Service)",
+      "item": [
+        {
+          "name": "7.1 Publish Direct to Inventory",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"direct.command\",\n  \"payload\": {\n    \"command\": \"check_stock\",\n    \"item_id\": \"item-123\"\n  },\n  \"sender\": \"gateway\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/publish/subscriber/inventory-service-1",
+              "host": ["{{broker_url}}"],
+              "path": ["publish", "subscriber", "inventory-service-1"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "7.2 Get Messages for Inventory",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/messages/inventory-service-1",
+              "host": ["{{broker_url}}"],
+              "path": ["messages", "inventory-service-1"]
+            }
+          },
+          "response": []
+        }
+      ],
+      "description": "Test direct publishing: Message goes ONLY to inventory-service-1"
+    },
+    {
+      "name": "8. End-to-End Integration (Real Workflow)",
+      "item": [
+        {
+          "name": "8.1 Check Shop Services Registered",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "stats"]
+            }
+          }
+        },
+        {
+          "name": "8.2 Forward Purchase via Broker (Load Balanced)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"POST\",\n  \"path\": \"/api/shop/purchase\",\n  \"headers\": {\n    \"Content-Type\": \"application/json\"\n  },\n  \"body\": {\n    \"userId\": \"user-123\",\n    \"itemId\": 1,\n    \"quantity\": 2\n  }\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          }
+        },
+        {
+          "name": "8.3 Verify Purchase Published to Broker",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/topics",
+              "host": ["{{broker_url}}"],
+              "path": ["topics"]
+            }
+          }
+        },
+        {
+          "name": "8.4 Get Shop Items via Broker (Load Balanced)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"GET\",\n  \"path\": \"/api/shop/items\",\n  \"headers\": {},\n  \"query_params\": {}\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          }
+        },
+        {
+          "name": "8.5 Make 5 Purchases - See Load Balancing",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Purchase successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "var jsonData = pm.response.json();",
+                  "console.log(\"Routed to instance: \" + jsonData.instance_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"POST\",\n  \"path\": \"/api/shop/purchase\",\n  \"headers\": {\n    \"Content-Type\": \"application/json\"\n  },\n  \"body\": {\n    \"userId\": \"user-123\",\n    \"itemId\": 1,\n    \"quantity\": 1\n  }\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          }
+        }
+      ],
+      "description": "Test real Shop Service integration through Message Broker with load balancing"
+    }
+  ],
+  "variable": [
+    {
+      "key": "broker_url",
+      "value": "http://localhost:8002",
+      "type": "string"
+    },
+    {
+      "key": "message_id",
+      "value": "msg-placeholder",
+      "type": "string",
+      "description": "Copy message_id from 4.5 response to use in 4.8"
+    }
+  ]
+}

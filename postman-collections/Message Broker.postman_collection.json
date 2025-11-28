@@ -1,0 +1,579 @@
+{
+  "info": {
+    "name": "Message Broker",
+    "description": "Message Broker API for PAD Lab 4 - Grade 3",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/health",
+              "host": ["{{broker_url}}"],
+              "path": ["health"]
+            }
+          }
+        },
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["stats"]
+            }
+          }
+        },
+        {
+          "name": "Root (Check Thread Info)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/",
+              "host": ["{{broker_url}}"],
+              "path": [""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Request Forwarding (Grade 3)",
+      "item": [
+        {
+          "name": "Forward GET Request to Shop",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"GET\",\n  \"path\": \"/api/shop/items\",\n  \"headers\": {},\n  \"query_params\": {}\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          }
+        },
+        {
+          "name": "Forward POST Request (Purchase)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"service_name\": \"shop\",\n  \"method\": \"POST\",\n  \"path\": \"/api/shop/purchase\",\n  \"headers\": {\n    \"Content-Type\": \"application/json\"\n  },\n  \"body\": {\n    \"userId\": \"user-123\",\n    \"itemId\": 1,\n    \"quantity\": 2\n  }\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/forward",
+              "host": ["{{broker_url}}"],
+              "path": ["forward"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Subscriptions",
+      "item": [
+        {
+          "name": "Subscribe to Topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"shop.purchase\",\n  \"subscriber_id\": \"inventory-service-1\",\n  \"service_name\": \"inventory\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/subscribe",
+              "host": ["{{broker_url}}"],
+              "path": ["subscribe"]
+            }
+          }
+        },
+        {
+          "name": "Get All Subscribers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/subscribers",
+              "host": ["{{broker_url}}"],
+              "path": ["subscribers"]
+            }
+          }
+        },
+        {
+          "name": "Unsubscribe from Topic",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/subscribe/inventory-service-1/shop.purchase",
+              "host": ["{{broker_url}}"],
+              "path": ["subscribe", "inventory-service-1", "shop.purchase"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Publishing",
+      "item": [
+        {
+          "name": "Publish to Topic",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"shop.purchase\",\n  \"payload\": {\n    \"user_id\": \"user-123\",\n    \"item_id\": \"item-456\",\n    \"quantity\": 2,\n    \"total_cost\": 150\n  },\n  \"sender\": \"shop-service\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/publish/topic",
+              "host": ["{{broker_url}}"],
+              "path": ["publish", "topic"]
+            }
+          }
+        },
+        {
+          "name": "Publish to Subscriber",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"direct.message\",\n  \"payload\": {\n    \"message\": \"Direct message to subscriber\"\n  },\n  \"sender\": \"gateway\"\n}"
+            },
+            "url": {
+              "raw": "{{broker_url}}/publish/subscriber/inventory-service-1",
+              "host": ["{{broker_url}}"],
+              "path": ["publish", "subscriber", "inventory-service-1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Messages",
+      "item": [
+        {
+          "name": "Get Messages for Subscriber",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/messages/inventory-service-1?limit=100",
+              "host": ["{{broker_url}}"],
+              "path": ["messages", "inventory-service-1"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "100"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Acknowledge Message",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/acknowledge/inventory-service-1/{{message_id}}",
+              "host": ["{{broker_url}}"],
+              "path": ["acknowledge", "inventory-service-1", "{{message_id}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Topics",
+      "item": [
+        {
+          "name": "Get All Topics",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/topics",
+              "host": ["{{broker_url}}"],
+              "path": ["topics"]
+            }
+          }
+        },
+        {
+          "name": "Get Topic Subscribers",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/topics/shop.purchase/subscribers",
+              "host": ["{{broker_url}}"],
+              "path": ["topics", "shop.purchase", "subscribers"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Load Balancer",
+      "item": [
+        {
+          "name": "Register Service Instance",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/register?service_name=shop&url=http://shop-service-1:8080",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "register"],
+              "query": [
+                {
+                  "key": "service_name",
+                  "value": "shop"
+                },
+                {
+                  "key": "url",
+                  "value": "http://shop-service-1:8080"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Load Balancer Stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/stats",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Next Instance",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{broker_url}}/load-balancer/shop/next",
+              "host": ["{{broker_url}}"],
+              "path": ["load-balancer", "shop", "next"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. GRADE 3 COMPLETE VERIFICATION",
+      "item": [
+        {
+          "name": "9.1 Verify Headers - Single Request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Test 1: Response is successful",
+                  "pm.test(\"✅ Status is 200 OK\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "// Test 2: Check X-Handled-By-Instance header",
+                  "pm.test(\"✅ Has X-Handled-By-Instance header\", function () {",
+                  "    pm.response.to.have.header(\"X-Handled-By-Instance\");",
+                  "    var instance = pm.response.headers.get(\"X-Handled-By-Instance\");",
+                  "    console.log(\"\\n🎯 Handled by instance: \" + instance);",
+                  "    pm.expect(instance).to.include(\"shop\");",
+                  "});",
+                  "",
+                  "// Test 3: Check X-Routed-Via header",
+                  "pm.test(\"✅ Has X-Routed-Via=message-broker header\", function () {",
+                  "    pm.response.to.have.header(\"X-Routed-Via\");",
+                  "    var routing = pm.response.headers.get(\"X-Routed-Via\");",
+                  "    pm.expect(routing).to.equal(\"message-broker\");",
+                  "    console.log(\"✅ Routed via: \" + routing);",
+                  "});",
+                  "",
+                  "// Test 4: Check X-Service-Name header",
+                  "pm.test(\"✅ Has X-Service-Name=shop header\", function () {",
+                  "    pm.response.to.have.header(\"X-Service-Name\");",
+                  "    var service = pm.response.headers.get(\"X-Service-Name\");",
+                  "    pm.expect(service).to.equal(\"shop\");",
+                  "    console.log(\"✅ Service: \" + service);",
+                  "});",
+                  "",
+                  "// Summary",
+                  "console.log(\"\\n\" + \"=\".repeat(50));",
+                  "console.log(\"🎉 GRADE 3 VERIFICATION PASSED!\");",
+                  "console.log(\"=\".repeat(50));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8081/shop/items",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8081",
+              "path": ["shop", "items"]
+            }
+          }
+        },
+        {
+          "name": "9.2 Verify Round-Robin - Run 9 Times",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "// Get instance from headers",
+                  "var instance = pm.response.headers.get(\"X-Handled-By-Instance\");",
+                  "var instanceNum = instance ? instance.split(\"-\")[1] : \"unknown\";",
+                  "",
+                  "// Store in environment for tracking",
+                  "if (!pm.globals.get(\"request_count\")) {",
+                  "    pm.globals.set(\"request_count\", 1);",
+                  "    pm.globals.set(\"pattern\", instanceNum);",
+                  "} else {",
+                  "    var count = parseInt(pm.globals.get(\"request_count\")) + 1;",
+                  "    var pattern = pm.globals.get(\"pattern\") + \" → \" + instanceNum;",
+                  "    pm.globals.set(\"request_count\", count);",
+                  "    pm.globals.set(\"pattern\", pattern);",
+                  "}",
+                  "",
+                  "var count = pm.globals.get(\"request_count\");",
+                  "console.log(\"Request \" + count + \": Instance-\" + instanceNum);",
+                  "",
+                  "// After 9 requests, show pattern",
+                  "if (count >= 9) {",
+                  "    console.log(\"\\n\" + \"=\".repeat(50));",
+                  "    console.log(\"🔄 ROUND-ROBIN PATTERN:\");",
+                  "    console.log(pm.globals.get(\"pattern\"));",
+                  "    console.log(\"\\n📝 Expected: 0 → 1 → 2 → 0 → 1 → 2 → 0 → 1 → 2\");",
+                  "    console.log(\"=\".repeat(50));",
+                  "    ",
+                  "    // Reset for next test",
+                  "    pm.globals.unset(\"request_count\");",
+                  "    pm.globals.unset(\"pattern\");",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8081/shop/items",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8081",
+              "path": ["shop", "items"]
+            }
+          }
+        },
+        {
+          "name": "9.3 Verify Circuit Breaker Works",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Step 1: Fail instance-1",
+                  "pm.sendRequest({",
+                  "    url: 'http://localhost:8002/load-balancer/shop/1/fail',",
+                  "    method: 'POST'",
+                  "}, function (err, res) {",
+                  "    console.log(\"\\n🔴 CIRCUIT BREAKER TEST\");",
+                  "    console.log(\"=\".repeat(50));",
+                  "    console.log(\"Step 1: Failed instance-1 (opened circuit)\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var instance = pm.response.headers.get(\"X-Handled-By-Instance\");",
+                  "var instanceNum = instance ? instance.split(\"-\")[1] : \"unknown\";",
+                  "",
+                  "console.log(\"Step 2: Made request, got Instance-\" + instanceNum);",
+                  "",
+                  "pm.test(\"✅ Instance-1 was skipped (circuit open)\", function () {",
+                  "    pm.expect(instanceNum).to.not.equal(\"1\");",
+                  "});",
+                  "",
+                  "if (instanceNum !== \"1\") {",
+                  "    console.log(\"✅ Circuit Breaker WORKING! Instance-1 skipped.\");",
+                  "} else {",
+                  "    console.log(\"❌ Circuit Breaker FAILED! Instance-1 still used.\");",
+                  "}",
+                  "",
+                  "// Recover instance for next test",
+                  "pm.sendRequest({",
+                  "    url: 'http://localhost:8002/load-balancer/shop/1/recover',",
+                  "    method: 'POST'",
+                  "}, function (err, res) {",
+                  "    console.log(\"Step 3: Recovered instance-1 (closed circuit)\");",
+                  "    console.log(\"=\".repeat(50));",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "http://localhost:8081/shop/items",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8081",
+              "path": ["shop", "items"]
+            }
+          }
+        },
+        {
+          "name": "9.4 Verify Service-to-Service (Purchase Event)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Subscribe inventory to shop.purchase",
+                  "pm.sendRequest({",
+                  "    url: 'http://localhost:8002/subscribe',",
+                  "    method: 'POST',",
+                  "    header: {'Content-Type': 'application/json'},",
+                  "    body: {",
+                  "        mode: 'raw',",
+                  "        raw: JSON.stringify({",
+                  "            topic: 'shop.purchase',",
+                  "            subscriber_id: 'inventory-service-1',",
+                  "            service_name: 'inventory'",
+                  "        })",
+                  "    }",
+                  "}, function (err, res) {",
+                  "    console.log(\"\\n📡 SERVICE-TO-SERVICE TEST\");",
+                  "    console.log(\"=\".repeat(50));",
+                  "    console.log(\"Step 1: Subscribed inventory-service to shop.purchase\");",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"✅ Purchase successful\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "console.log(\"Step 2: Made purchase via Gateway → Broker → Shop\");",
+                  "",
+                  "// Wait for event to be published",
+                  "setTimeout(function() {",
+                  "    pm.sendRequest('http://localhost:8002/messages/inventory-service-1', function (err, res) {",
+                  "        var data = res.json();",
+                  "        console.log(\"Step 3: Checked inventory queue\");",
+                  "        console.log(\"Messages in queue: \" + data.message_count);",
+                  "        ",
+                  "        if (data.message_count > 0) {",
+                  "            console.log(\"✅ Service-to-Service WORKING!\");",
+                  "            console.log(\"Message topic: \" + data.messages[0].topic);",
+                  "            console.log(\"Message payload: \" + JSON.stringify(data.messages[0].payload, null, 2));",
+                  "        } else {",
+                  "            console.log(\"⚠️ No messages found (might need to check Shop Service logs)\");",
+                  "        }",
+                  "        console.log(\"=\".repeat(50));",
+                  "    });",
+                  "}, 1000);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"user-test-123\",\n  \"itemId\": \"aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\",\n  \"quantity\": 1\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8081/shop/purchase",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8081",
+              "path": ["shop", "purchase"]
+            }
+          }
+        }
+      ],
+      "description": "Complete Grade 3 verification suite - Run all 4 tests to verify everything works"
+    }
+  ],
+  "variable": [
+    {
+      "key": "broker_url",
+      "value": "http://localhost:8002",
+      "type": "string"
+    }
+  ]
+}

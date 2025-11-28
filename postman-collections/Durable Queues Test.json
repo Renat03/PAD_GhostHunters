@@ -1,0 +1,697 @@
+{
+    "info": {
+        "_postman_id": "durable-queue-test-collection",
+        "name": "Message Broker - Durable Queue & Dead Letter Tests",
+        "description": "Test collection for Grade 6-7-9: Durable Queues, Dead Letter Channel, and Topics endpoints",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Setup & Health Checks",
+            "item": [
+                {
+                    "name": "Health Check - Message Broker",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/health",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["health"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Broker Stats (with Durable Queue Stats)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/stats",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["stats"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Health Check - Inventory Service",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:5004/health",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "5004",
+                            "path": ["health"]
+                        }
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "2. Grade 9 - Topics Endpoints",
+            "item": [
+                {
+                    "name": "Get All Topics",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/topics",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["topics"]
+                        },
+                        "description": "Grade 9: Fetch list of all available topics from the Message Broker"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Subscribers for Topic (shop.purchase)",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/topics/shop.purchase/subscribers",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["topics", "shop.purchase", "subscribers"]
+                        },
+                        "description": "Get all subscribers for the shop.purchase topic"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Subscribers",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/subscribers",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["subscribers"]
+                        },
+                        "description": "Get all registered subscribers across all topics"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "3. Test Durable Queues (Grade 6)",
+            "item": [
+                {
+                    "name": "Subscribe Inventory Service to shop.purchase",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"topic\": \"shop.purchase\",\n    \"subscriber_id\": \"inventory-service-test-1\",\n    \"service_name\": \"inventory-service\"\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8002/subscribe",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["subscribe"]
+                        },
+                        "description": "Subscribe a test subscriber to the shop.purchase topic"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Publish Test Purchase Event",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Message published successfully\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.success).to.be.true;",
+                                    "    pm.expect(jsonData.durable).to.be.true;",
+                                    "    pm.environment.set(\"last_message_id\", jsonData.message_id);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"topic\": \"shop.purchase\",\n    \"sender\": \"shop-service\",\n    \"payload\": {\n        \"userId\": \"test-user-123\",\n        \"itemId\": \"{{$guid}}\",\n        \"quantity\": 2,\n        \"totalCost\": 50.00,\n        \"transactionId\": \"txn-{{$timestamp}}\",\n        \"timestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8002/publish/topic",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["publish", "topic"]
+                        },
+                        "description": "Grade 6: Publish a message that will be persisted to durable storage"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Poll Messages (Retrieve from Durable Queue)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Messages retrieved from durable queue\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.source).to.eql(\"durable_queue\");",
+                                    "    if (jsonData.messages.length > 0) {",
+                                    "        pm.environment.set(\"test_message_id\", jsonData.messages[0].id);",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1?limit=10",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1"],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "10"
+                                }
+                            ]
+                        },
+                        "description": "Grade 6: Retrieve messages from durable storage"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Acknowledge Message (Remove from Durable Queue)",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/acknowledge/inventory-service-test-1/{{test_message_id}}",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["acknowledge", "inventory-service-test-1", "{{test_message_id}}"]
+                        },
+                        "description": "Grade 6: Acknowledge message to remove it from durable queue"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Verify Message Removed from Queue",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Message no longer in queue\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var messageIds = jsonData.messages.map(m => m.id);",
+                                    "    pm.expect(messageIds).to.not.include(pm.environment.get(\"test_message_id\"));",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1"]
+                        },
+                        "description": "Verify the acknowledged message is no longer in the queue"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "4. Test Dead Letter Channel (Grade 7)",
+            "item": [
+                {
+                    "name": "Publish Message for Retry Testing",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Message published for retry test\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.environment.set(\"retry_message_id\", jsonData.message_id);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"topic\": \"shop.purchase\",\n    \"sender\": \"shop-service\",\n    \"payload\": {\n        \"userId\": \"test-user-retry\",\n        \"itemId\": \"INVALID-ITEM-ID\",\n        \"quantity\": 1,\n        \"totalCost\": 25.00,\n        \"transactionId\": \"retry-txn-{{$timestamp}}\",\n        \"timestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8002/publish/topic",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["publish", "topic"]
+                        },
+                        "description": "Publish a message that will be intentionally failed for retry testing"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Message for Retry Test",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Retrieved message for retry\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    if (jsonData.messages.length > 0) {",
+                                    "        var message = jsonData.messages.find(m => m.payload.itemId === \"INVALID-ITEM-ID\");",
+                                    "        if (message) {",
+                                    "            pm.environment.set(\"retry_message_id\", message.id);",
+                                    "        }",
+                                    "    }",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1"]
+                        }
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Report Message Failure - Attempt 1",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1/{{retry_message_id}}/fail?failure_reason=Invalid item ID format",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1", "{{retry_message_id}}", "fail"],
+                            "query": [
+                                {
+                                    "key": "failure_reason",
+                                    "value": "Invalid item ID format"
+                                }
+                            ]
+                        },
+                        "description": "Grade 7: Report first failure (retry 1/3)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Report Message Failure - Attempt 2",
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1/{{retry_message_id}}/fail?failure_reason=Invalid item ID format - retry 2",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1", "{{retry_message_id}}", "fail"],
+                            "query": [
+                                {
+                                    "key": "failure_reason",
+                                    "value": "Invalid item ID format - retry 2"
+                                }
+                            ]
+                        },
+                        "description": "Grade 7: Report second failure (retry 2/3)"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Report Message Failure - Attempt 3 (Move to Dead Letter)",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Message moved to dead letter\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.action).to.eql(\"moved_to_dead_letter\");",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1/{{retry_message_id}}/fail?failure_reason=Invalid item ID format - max retries exceeded",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1", "{{retry_message_id}}", "fail"],
+                            "query": [
+                                {
+                                    "key": "failure_reason",
+                                    "value": "Invalid item ID format - max retries exceeded"
+                                }
+                            ]
+                        },
+                        "description": "Grade 7: Report third failure - should move to dead letter channel"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get All Dead Letter Messages",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Dead letter messages retrieved\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    pm.expect(jsonData.dead_letter_count).to.be.above(0);",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/dead-letter?limit=100",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["dead-letter"],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "100"
+                                }
+                            ]
+                        },
+                        "description": "Grade 7: Fetch all messages from dead letter channel"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Get Dead Letter Messages by Topic",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/dead-letter/shop.purchase?limit=50",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["dead-letter", "shop.purchase"],
+                            "query": [
+                                {
+                                    "key": "limit",
+                                    "value": "50"
+                                }
+                            ]
+                        },
+                        "description": "Grade 7: Fetch dead letter messages filtered by topic"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Verify Message Removed from Active Queue",
+                    "event": [
+                        {
+                            "listen": "test",
+                            "script": {
+                                "exec": [
+                                    "pm.test(\"Message no longer in active queue\", function () {",
+                                    "    pm.response.to.have.status(200);",
+                                    "    var jsonData = pm.response.json();",
+                                    "    var messageIds = jsonData.messages.map(m => m.id);",
+                                    "    pm.expect(messageIds).to.not.include(pm.environment.get(\"retry_message_id\"));",
+                                    "});"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/messages/inventory-service-test-1",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["messages", "inventory-service-test-1"]
+                        },
+                        "description": "Verify the failed message was removed from active queue"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "5. End-to-End Integration Test",
+            "item": [
+                {
+                    "name": "Publish Valid Purchase via Shop Service",
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"topic\": \"shop.purchase\",\n    \"sender\": \"shop-service\",\n    \"payload\": {\n        \"userId\": \"user-{{$randomInt}}\",\n        \"itemId\": \"{{$guid}}\",\n        \"quantity\": 3,\n        \"totalCost\": 75.00,\n        \"transactionId\": \"e2e-txn-{{$timestamp}}\",\n        \"timestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8002/publish/topic",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["publish", "topic"]
+                        },
+                        "description": "Publish a valid purchase that should be processed successfully"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Wait 10 seconds for Processing",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:5004/health",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "5004",
+                            "path": ["health"]
+                        },
+                        "description": "Wait for the inventory service to process the message"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Check Inventory Service Processed Message",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:5004/api/inventory",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "5004",
+                            "path": ["api", "inventory"]
+                        },
+                        "description": "Verify the purchase was added to inventory"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "6. Stress Test - Multiple Messages",
+            "item": [
+                {
+                    "name": "Publish 10 Messages Rapidly",
+                    "event": [
+                        {
+                            "listen": "prerequest",
+                            "script": {
+                                "exec": [
+                                    "// This script can be modified to run multiple times"
+                                ],
+                                "type": "text/javascript"
+                            }
+                        }
+                    ],
+                    "request": {
+                        "method": "POST",
+                        "header": [
+                            {
+                                "key": "Content-Type",
+                                "value": "application/json"
+                            }
+                        ],
+                        "body": {
+                            "mode": "raw",
+                            "raw": "{\n    \"topic\": \"shop.purchase\",\n    \"sender\": \"shop-service\",\n    \"payload\": {\n        \"userId\": \"stress-user-{{$randomInt}}\",\n        \"itemId\": \"{{$guid}}\",\n        \"quantity\": {{$randomInt}},\n        \"totalCost\": {{$randomInt}}.00,\n        \"transactionId\": \"stress-txn-{{$timestamp}}-{{$randomInt}}\",\n        \"timestamp\": \"{{$isoTimestamp}}\"\n    }\n}"
+                        },
+                        "url": {
+                            "raw": "http://localhost:8002/publish/topic",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["publish", "topic"]
+                        },
+                        "description": "Publish multiple messages to test durable queue performance"
+                    },
+                    "response": []
+                },
+                {
+                    "name": "Check Queue Stats After Stress Test",
+                    "request": {
+                        "method": "GET",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/stats",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["stats"]
+                        },
+                        "description": "Check durable queue statistics after stress test"
+                    },
+                    "response": []
+                }
+            ]
+        },
+        {
+            "name": "7. Cleanup",
+            "item": [
+                {
+                    "name": "Unsubscribe Test Subscriber",
+                    "request": {
+                        "method": "DELETE",
+                        "header": [],
+                        "url": {
+                            "raw": "http://localhost:8002/subscribe/inventory-service-test-1/shop.purchase",
+                            "protocol": "http",
+                            "host": ["localhost"],
+                            "port": "8002",
+                            "path": ["subscribe", "inventory-service-test-1", "shop.purchase"]
+                        },
+                        "description": "Clean up test subscriber"
+                    },
+                    "response": []
+                }
+            ]
+        }
+    ],
+    "event": [
+        {
+            "listen": "prerequest",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        },
+        {
+            "listen": "test",
+            "script": {
+                "type": "text/javascript",
+                "exec": [
+                    ""
+                ]
+            }
+        }
+    ],
+    "variable": [
+        {
+            "key": "broker_url",
+            "value": "http://localhost:8002",
+            "type": "string"
+        },
+        {
+            "key": "inventory_url",
+            "value": "http://localhost:5004",
+            "type": "string"
+        }
+    ]
+}
