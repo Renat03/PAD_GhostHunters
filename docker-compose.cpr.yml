@@ -1,99 +1,181 @@
 version: "3.9"
 
 services:
-  # === Databases ===
+  # ============================================
+  # REPLICATED DATABASES - PostgreSQL
+  # ============================================
   
-  shop-postgres:
+  # === SHOP DATABASE CLUSTER ===
+  shop-postgres-primary:
     image: postgres:16
     platform: linux/amd64
-    container_name: cpr-shop-postgres
+    container_name: cpr-shop-postgres-primary
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${SHOP_POSTGRES_DB}
-      POSTGRES_USER: ${SHOP_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${SHOP_POSTGRES_DB:-shopdb}
+      POSTGRES_USER: ${SHOP_POSTGRES_USER:-shopuser}
+      POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD:-shoppass}
+      POSTGRES_INITDB_ARGS: "--auth-host=md5"
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c wal_keep_size=64MB
+      -c hot_standby=on
+      -c max_replication_slots=3
+      -c listen_addresses='*'
+      -c hba_file=/etc/postgresql/pg_hba.conf
     volumes:
-      - cpr_shop_pgdata:/var/lib/postgresql/data
+      - cpr_shop_primary_pgdata:/var/lib/postgresql/data
       - ./microservices/shop-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
-    command: ["postgres", "-c", "log_statement=all", "-c", "log_min_duration_statement=0"]
+      - ./microservices/db-replication/postgres/init-replication.sh:/docker-entrypoint-initdb.d/002-replication.sh:ro
+      - ./microservices/db-replication/postgres/pg_hba_replication.conf:/etc/postgresql/pg_hba.conf:ro
     networks:
       - cpr-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${SHOP_POSTGRES_USER} -d ${SHOP_POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${SHOP_POSTGRES_USER:-shopuser} -d ${SHOP_POSTGRES_DB:-shopdb}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  journal-postgres:
+  shop-postgres-replica:
     image: postgres:16
     platform: linux/amd64
-    container_name: cpr-journal-postgres
+    container_name: cpr-shop-postgres-replica
+    restart: unless-stopped
+    depends_on:
+      shop-postgres-primary:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${SHOP_POSTGRES_DB:-shopdb}
+      POSTGRES_USER: ${SHOP_POSTGRES_USER:-shopuser}
+      POSTGRES_PASSWORD: ${SHOP_POSTGRES_PASSWORD:-shoppass}
+      PGUSER: ${SHOP_POSTGRES_USER:-shopuser}
+    entrypoint: |
+      bash -c "
+        set -e
+        until pg_isready -h shop-postgres-primary -p 5432 -U ${SHOP_POSTGRES_USER:-shopuser}; do
+          echo 'Waiting for primary...'
+          sleep 2
+        done
+        
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          echo 'Initializing replica from primary...'
+          rm -rf /var/lib/postgresql/data/*
+          PGPASSWORD=repl_password_123 pg_basebackup -h shop-postgres-primary -D /var/lib/postgresql/data -U replicator -vP -R -X stream
+          chmod 700 /var/lib/postgresql/data
+        fi
+        
+        exec docker-entrypoint.sh postgres -c hot_standby=on
+      "
+    volumes:
+      - cpr_shop_replica_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${SHOP_POSTGRES_USER:-shopuser} -d ${SHOP_POSTGRES_DB:-shopdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === JOURNAL DATABASE CLUSTER ===
+  journal-postgres-primary:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: cpr-journal-postgres-primary
     restart: unless-stopped
     environment:
-      POSTGRES_DB: ${JOURNAL_POSTGRES_DB}
-      POSTGRES_USER: ${JOURNAL_POSTGRES_USER}
-      POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_PASSWORD}
+      POSTGRES_DB: ${JOURNAL_POSTGRES_DB:-journaldb}
+      POSTGRES_USER: ${JOURNAL_POSTGRES_USER:-journaluser}
+      POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_PASSWORD:-journalpass}
+    command: |
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c wal_keep_size=64MB
+      -c hot_standby=on
+      -c synchronous_commit=on
+      -c max_replication_slots=3
+      -c listen_addresses='*'
+      -c hba_file=/etc/postgresql/pg_hba.conf
     volumes:
-      - cpr_journal_pgdata:/var/lib/postgresql/data
+      - cpr_journal_primary_pgdata:/var/lib/postgresql/data
       - ./microservices/journal-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
-    command: ["postgres", "-c", "log_statement=all", "-c", "log_min_duration_statement=0"]
+      - ./microservices/db-replication/postgres/init-replication.sh:/docker-entrypoint-initdb.d/002-replication.sh:ro
+      - ./microservices/db-replication/postgres/pg_hba_replication.conf:/etc/postgresql/pg_hba.conf:ro
     networks:
       - cpr-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${JOURNAL_POSTGRES_USER} -d ${JOURNAL_POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -U ${JOURNAL_POSTGRES_USER:-journaluser} -d ${JOURNAL_POSTGRES_DB:-journaldb}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  ghost-postgres:
+  journal-postgres-replica:
     image: postgres:16
     platform: linux/amd64
-    container_name: cpr-ghost-postgres
+    container_name: cpr-journal-postgres-replica
     restart: unless-stopped
+    depends_on:
+      journal-postgres-primary:
+        condition: service_healthy
     environment:
-      POSTGRES_USER: ${GHOST_POSTGRES_USER:-ghostuser}
-      POSTGRES_PASSWORD: ${GHOST_POSTGRES_PASSWORD:-ghostpass}
-      POSTGRES_DB: ${GHOST_POSTGRES_DB:-ghostdb}
+      POSTGRES_DB: ${JOURNAL_POSTGRES_DB:-journaldb}
+      POSTGRES_USER: ${JOURNAL_POSTGRES_USER:-journaluser}
+      POSTGRES_PASSWORD: ${JOURNAL_POSTGRES_PASSWORD:-journalpass}
+      PGUSER: ${JOURNAL_POSTGRES_USER:-journaluser}
+    entrypoint: |
+      bash -c "
+        set -e
+        until pg_isready -h journal-postgres-primary -p 5432 -U ${JOURNAL_POSTGRES_USER:-journaluser}; do
+          echo 'Waiting for primary...'
+          sleep 2
+        done
+        
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          echo 'Initializing replica from primary...'
+          rm -rf /var/lib/postgresql/data/*
+          PGPASSWORD=repl_password_123 pg_basebackup -h journal-postgres-primary -D /var/lib/postgresql/data -U replicator -vP -R -X stream
+          chmod 700 /var/lib/postgresql/data
+        fi
+        
+        exec docker-entrypoint.sh postgres -c hot_standby=on
+      "
     volumes:
-      - cpr_ghost_pgdata:/var/lib/postgresql/data
+      - cpr_journal_replica_pgdata:/var/lib/postgresql/data
     networks:
       - cpr-network
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${GHOST_POSTGRES_USER:-ghostuser} -d ${GHOST_POSTGRES_DB:-ghostdb}"]
+      test: ["CMD-SHELL", "pg_isready -U ${JOURNAL_POSTGRES_USER:-journaluser} -d ${JOURNAL_POSTGRES_DB:-journaldb}"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  chat-postgres:
+  # === INVENTORY DATABASE CLUSTER ===
+  inventory-postgres-primary:
     image: postgres:16
     platform: linux/amd64
-    container_name: cpr-chat-postgres
-    restart: unless-stopped
-    environment:
-      POSTGRES_DB: ${CHAT_POSTGRES_DB:-chatdb}
-      POSTGRES_USER: ${CHAT_POSTGRES_USER:-chatuser}
-      POSTGRES_PASSWORD: ${CHAT_POSTGRES_PASSWORD:-chatpass}
-    volumes:
-      - cpr_chat_pgdata:/var/lib/postgresql/data
-    networks:
-      - cpr-network
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${CHAT_POSTGRES_USER:-chatuser} -d ${CHAT_POSTGRES_DB:-chatdb}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  inventory-postgres:
-    image: postgres:16
-    platform: linux/amd64
-    container_name: cpr-inventory-postgres
+    container_name: cpr-inventory-postgres-primary
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${INVENTORY_POSTGRES_DB:-inventorydb}
       POSTGRES_USER: ${INVENTORY_POSTGRES_USER:-inventoryuser}
       POSTGRES_PASSWORD: ${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+    command: |
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c wal_keep_size=64MB
+      -c hot_standby=on
+      -c synchronous_commit=on
+      -c max_replication_slots=3
+      -c listen_addresses='*'
+      -c hba_file=/etc/postgresql/pg_hba.conf
     volumes:
-      - cpr_inventory_pgdata:/var/lib/postgresql/data
+      - cpr_inventory_primary_pgdata:/var/lib/postgresql/data
+      - ./microservices/inventory-service/db/init.sql:/docker-entrypoint-initdb.d/001-init.sql:ro
+      - ./microservices/db-replication/postgres/init-replication.sh:/docker-entrypoint-initdb.d/002-replication.sh:ro
+      - ./microservices/db-replication/postgres/pg_hba_replication.conf:/etc/postgresql/pg_hba.conf:ro
     networks:
       - cpr-network
     healthcheck:
@@ -102,6 +184,275 @@ services:
       timeout: 5s
       retries: 5
 
+  inventory-postgres-replica:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: cpr-inventory-postgres-replica
+    restart: unless-stopped
+    depends_on:
+      inventory-postgres-primary:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${INVENTORY_POSTGRES_DB:-inventorydb}
+      POSTGRES_USER: ${INVENTORY_POSTGRES_USER:-inventoryuser}
+      POSTGRES_PASSWORD: ${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+      PGUSER: ${INVENTORY_POSTGRES_USER:-inventoryuser}
+    entrypoint: |
+      bash -c "
+        set -e
+        until pg_isready -h inventory-postgres-primary -p 5432 -U ${INVENTORY_POSTGRES_USER:-inventoryuser}; do
+          echo 'Waiting for primary...'
+          sleep 2
+        done
+        
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          echo 'Initializing replica from primary...'
+          rm -rf /var/lib/postgresql/data/*
+          PGPASSWORD=repl_password_123 pg_basebackup -h inventory-postgres-primary -D /var/lib/postgresql/data -U replicator -vP -R -X stream
+          chmod 700 /var/lib/postgresql/data
+        fi
+        
+        exec docker-entrypoint.sh postgres -c hot_standby=on
+      "
+    volumes:
+      - cpr_inventory_replica_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${INVENTORY_POSTGRES_USER:-inventoryuser} -d ${INVENTORY_POSTGRES_DB:-inventorydb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === CHAT DATABASE CLUSTER ===
+  chat-postgres-primary:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: cpr-chat-postgres-primary
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${CHAT_POSTGRES_DB:-chatdb}
+      POSTGRES_USER: ${CHAT_POSTGRES_USER:-chatuser}
+      POSTGRES_PASSWORD: ${CHAT_POSTGRES_PASSWORD:-chatpass}
+    command: |
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c wal_keep_size=64MB
+      -c hot_standby=on
+      -c synchronous_commit=on
+      -c max_replication_slots=3
+      -c listen_addresses='*'
+      -c hba_file=/etc/postgresql/pg_hba.conf
+    volumes:
+      - cpr_chat_primary_pgdata:/var/lib/postgresql/data
+      - ./microservices/db-replication/postgres/init-replication.sh:/docker-entrypoint-initdb.d/002-replication.sh:ro
+      - ./microservices/db-replication/postgres/pg_hba_replication.conf:/etc/postgresql/pg_hba.conf:ro
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CHAT_POSTGRES_USER:-chatuser} -d ${CHAT_POSTGRES_DB:-chatdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  chat-postgres-replica:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: cpr-chat-postgres-replica
+    restart: unless-stopped
+    depends_on:
+      chat-postgres-primary:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${CHAT_POSTGRES_DB:-chatdb}
+      POSTGRES_USER: ${CHAT_POSTGRES_USER:-chatuser}
+      POSTGRES_PASSWORD: ${CHAT_POSTGRES_PASSWORD:-chatpass}
+      PGUSER: ${CHAT_POSTGRES_USER:-chatuser}
+    entrypoint: |
+      bash -c "
+        set -e
+        until pg_isready -h chat-postgres-primary -p 5432 -U ${CHAT_POSTGRES_USER:-chatuser}; do
+          echo 'Waiting for primary...'
+          sleep 2
+        done
+        
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          echo 'Initializing replica from primary...'
+          rm -rf /var/lib/postgresql/data/*
+          PGPASSWORD=repl_password_123 pg_basebackup -h chat-postgres-primary -D /var/lib/postgresql/data -U replicator -vP -R -X stream
+          chmod 700 /var/lib/postgresql/data
+        fi
+        
+        exec docker-entrypoint.sh postgres -c hot_standby=on
+      "
+    volumes:
+      - cpr_chat_replica_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${CHAT_POSTGRES_USER:-chatuser} -d ${CHAT_POSTGRES_DB:-chatdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # === GHOST DATABASE CLUSTER ===
+  ghost-postgres-primary:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: cpr-ghost-postgres-primary
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${GHOST_POSTGRES_DB:-ghostdb}
+      POSTGRES_USER: ${GHOST_POSTGRES_USER:-ghostuser}
+      POSTGRES_PASSWORD: ${GHOST_POSTGRES_PASSWORD:-ghostpass}
+    command: |
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=3
+      -c wal_keep_size=64MB
+      -c hot_standby=on
+      -c synchronous_commit=on
+      -c max_replication_slots=3
+      -c listen_addresses='*'
+      -c hba_file=/etc/postgresql/pg_hba.conf
+    volumes:
+      - cpr_ghost_primary_pgdata:/var/lib/postgresql/data
+      - ./microservices/db-replication/postgres/init-replication.sh:/docker-entrypoint-initdb.d/002-replication.sh:ro
+      - ./microservices/db-replication/postgres/pg_hba_replication.conf:/etc/postgresql/pg_hba.conf:ro
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "pg_isready -U ${GHOST_POSTGRES_USER:-ghostuser} -d ${GHOST_POSTGRES_DB:-ghostdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ghost-postgres-replica:
+    image: postgres:16
+    platform: linux/amd64
+    container_name: cpr-ghost-postgres-replica
+    restart: unless-stopped
+    depends_on:
+      ghost-postgres-primary:
+        condition: service_healthy
+    environment:
+      POSTGRES_DB: ${GHOST_POSTGRES_DB:-ghostdb}
+      POSTGRES_USER: ${GHOST_POSTGRES_USER:-ghostuser}
+      POSTGRES_PASSWORD: ${GHOST_POSTGRES_PASSWORD:-ghostpass}
+      PGUSER: ${GHOST_POSTGRES_USER:-ghostuser}
+    entrypoint: |
+      bash -c "
+        set -e
+        until pg_isready -h ghost-postgres-primary -p 5432 -U ${GHOST_POSTGRES_USER:-ghostuser}; do
+          echo 'Waiting for primary...'
+          sleep 2
+        done
+        
+        if [ ! -s /var/lib/postgresql/data/PG_VERSION ]; then
+          echo 'Initializing replica from primary...'
+          rm -rf /var/lib/postgresql/data/*
+          PGPASSWORD=repl_password_123 pg_basebackup -h ghost-postgres-primary -D /var/lib/postgresql/data -U replicator -vP -R -X stream
+          chmod 700 /var/lib/postgresql/data
+        fi
+        
+        exec docker-entrypoint.sh postgres -c hot_standby=on
+      "
+    volumes:
+      - cpr_ghost_replica_pgdata:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "pg_isready -U ${GHOST_POSTGRES_USER:-ghostuser} -d ${GHOST_POSTGRES_DB:-ghostdb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ============================================
+  # REPLICATED DATABASES - MongoDB Replica Sets
+  # ============================================
+
+  # === USER MANAGEMENT MONGODB REPLICA SET ===
+  user-mongodb-primary:
+    image: mongo:7.0
+    platform: linux/amd64
+    container_name: cpr-user-mongodb-primary
+    restart: unless-stopped
+    command: mongod --replSet user-rs --bind_ip_all
+    environment:
+      # Remove authentication for development
+      MONGO_INITDB_DATABASE: ${USER_MONGO_DB:-user_management}
+    volumes:
+      - cpr_user_mongodb_primary:/data/db
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  user-mongodb-secondary:
+    image: mongo:7.0
+    platform: linux/amd64
+    container_name: cpr-user-mongodb-secondary
+    restart: unless-stopped
+    command: mongod --replSet user-rs --bind_ip_all
+    volumes:
+      - cpr_user_mongodb_secondary:/data/db
+    depends_on:
+      - user-mongodb-primary
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # === GHOST AI MONGODB REPLICA SET ===
+  ghost-ai-mongodb-primary:
+    image: mongo:7-jammy
+    platform: linux/amd64
+    container_name: cpr-ghost-ai-mongodb-primary
+    restart: unless-stopped
+    command: mongod --replSet ghostai-rs --bind_ip_all
+    environment:
+      # Remove authentication for development
+      MONGO_INITDB_DATABASE: ${GHOST_AI_MONGO_DB:-ghostai}
+    volumes:
+      - cpr_ghost_ai_mongodb_primary:/data/db
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  ghost-ai-mongodb-secondary:
+    image: mongo:7-jammy
+    platform: linux/amd64
+    container_name: cpr-ghost-ai-mongodb-secondary
+    restart: unless-stopped
+    command: mongod --replSet ghostai-rs --bind_ip_all
+    volumes:
+      - cpr_ghost_ai_mongodb_secondary:/data/db
+    depends_on:
+      - ghost-ai-mongodb-primary
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+
+  # === NON-REPLICATED DATABASES (kept for other services) ===
   lobby-mongodb:
     image: mongo:7.0
     platform: linux/amd64
@@ -140,61 +491,28 @@ services:
       timeout: 10s
       retries: 3
 
-  user-mongodb:
-    image: mongo:7.0
-    platform: linux/amd64
-    container_name: cpr-user-mongodb
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${USER_MONGO_USER:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${USER_MONGO_PASSWORD:-admin123}
-      MONGO_INITDB_DATABASE: ${USER_MONGO_DB:-user_management}
-    volumes:
-      - cpr_user_mongodb:/data/db
-    networks:
-      - cpr-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+  # ============================================
+  # SERVICES - All pointing to PRIMARY databases
+  # ============================================
 
-  ghost-ai-mongodb:
-    image: mongo:7-jammy
-    platform: linux/amd64
-    container_name: cpr-ghost-ai-mongodb
-    restart: unless-stopped
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: ${GHOST_AI_MONGO_USER:-ghostadmin}
-      MONGO_INITDB_ROOT_PASSWORD: ${GHOST_AI_MONGO_PASSWORD:-ghostpass123}
-      MONGO_INITDB_DATABASE: ${GHOST_AI_MONGO_DB:-ghostai}
-    volumes:
-      - cpr_ghost_ai_mongodb:/data/db
-    networks:
-      - cpr-network
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-
-  # === SCALED SHOP SERVICE (3 replicas) ===
+  # === SCALED SHOP SERVICE (3 replicas) - Connect to PRIMARY ===
   shop-service-1:
     image: ${SHOP_IMAGE:-vain12/shop-service}
     platform: linux/amd64
     container_name: cpr-shop-service-1
     depends_on:
-      shop-postgres:
+      shop-postgres-primary:
         condition: service_healthy
-      message-broker:  # ← ADD THIS
+      message-broker:
         condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      MESSAGE_BROKER_URL: http://message-broker:8002  # ← ADD THIS
-      SERVICE_NAME: shop-service-1  # ← ADD THIS
+      # UPDATED: Removed Target Session Attributes to fix Npgsql error
+      SHOP_DB_CONNECTION: Host=shop-postgres-primary,shop-postgres-replica;Port=5432;Database=${SHOP_POSTGRES_DB:-shopdb};Username=${SHOP_POSTGRES_USER:-shopuser};Password=${SHOP_POSTGRES_PASSWORD:-shoppass}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres-primary,shop-postgres-replica;Port=5432;Database=${SHOP_POSTGRES_DB:-shopdb};Username=${SHOP_POSTGRES_USER:-shopuser};Password=${SHOP_POSTGRES_PASSWORD:-shoppass}
+      MESSAGE_BROKER_URL: http://message-broker:8002
+      SERVICE_NAME: shop-service-1
     expose:
       - "8080"
     networks:
@@ -206,17 +524,18 @@ services:
     platform: linux/amd64
     container_name: cpr-shop-service-2
     depends_on:
-      shop-postgres:
+      shop-postgres-primary:
         condition: service_healthy
-      message-broker:  # ← ADD THIS
+      message-broker:
         condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      MESSAGE_BROKER_URL: http://message-broker:8002  # ← ADD THIS
-      SERVICE_NAME: shop-service-2  # ← ADD THIS
+      # UPDATED: Removed Target Session Attributes to fix Npgsql error
+      SHOP_DB_CONNECTION: Host=shop-postgres-primary,shop-postgres-replica;Port=5432;Database=${SHOP_POSTGRES_DB:-shopdb};Username=${SHOP_POSTGRES_USER:-shopuser};Password=${SHOP_POSTGRES_PASSWORD:-shoppass}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres-primary,shop-postgres-replica;Port=5432;Database=${SHOP_POSTGRES_DB:-shopdb};Username=${SHOP_POSTGRES_USER:-shopuser};Password=${SHOP_POSTGRES_PASSWORD:-shoppass}
+      MESSAGE_BROKER_URL: http://message-broker:8002
+      SERVICE_NAME: shop-service-2
     expose:
       - "8080"
     networks:
@@ -228,36 +547,37 @@ services:
     platform: linux/amd64
     container_name: cpr-shop-service-3
     depends_on:
-      shop-postgres:
+      shop-postgres-primary:
         condition: service_healthy
-      message-broker:  # ← ADD THIS
+      message-broker:
         condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      SHOP_DB_CONNECTION: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      ConnectionStrings__ShopDatabase: Host=shop-postgres;Port=5432;Database=${SHOP_POSTGRES_DB};Username=${SHOP_POSTGRES_USER};Password=${SHOP_POSTGRES_PASSWORD}
-      MESSAGE_BROKER_URL: http://message-broker:8002  # ← ADD THIS
-      SERVICE_NAME: shop-service-3  # ← ADD THIS
+      # UPDATED: Removed Target Session Attributes to fix Npgsql error
+      SHOP_DB_CONNECTION: Host=shop-postgres-primary,shop-postgres-replica;Port=5432;Database=${SHOP_POSTGRES_DB:-shopdb};Username=${SHOP_POSTGRES_USER:-shopuser};Password=${SHOP_POSTGRES_PASSWORD:-shoppass}
+      ConnectionStrings__ShopDatabase: Host=shop-postgres-primary,shop-postgres-replica;Port=5432;Database=${SHOP_POSTGRES_DB:-shopdb};Username=${SHOP_POSTGRES_USER:-shopuser};Password=${SHOP_POSTGRES_PASSWORD:-shoppass}
+      MESSAGE_BROKER_URL: http://message-broker:8002
+      SERVICE_NAME: shop-service-3
     expose:
       - "8080"
     networks:
       - cpr-network
     restart: unless-stopped
 
-  # === SCALED JOURNAL SERVICE (3 replicas) ===
+  # === SCALED JOURNAL SERVICE (3 replicas) - Connect to PRIMARY ===
   journal-service-1:
     image: ${JOURNAL_IMAGE:-vain12/journal-service}
     platform: linux/amd64
     container_name: cpr-journal-service-1
     depends_on:
-      journal-postgres:
+      journal-postgres-primary:
         condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
-      ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+      JOURNAL_DB_CONNECTION: Host=journal-postgres-primary;Port=5432;Database=${JOURNAL_POSTGRES_DB:-journaldb};Username=${JOURNAL_POSTGRES_USER:-journaluser};Password=${JOURNAL_POSTGRES_PASSWORD:-journalpass}
+      ConnectionStrings__JournalDatabase: Host=journal-postgres-primary;Port=5432;Database=${JOURNAL_POSTGRES_DB:-journaldb};Username=${JOURNAL_POSTGRES_USER:-journaluser};Password=${JOURNAL_POSTGRES_PASSWORD:-journalpass}
     expose:
       - "8080"
     networks:
@@ -269,13 +589,13 @@ services:
     platform: linux/amd64
     container_name: cpr-journal-service-2
     depends_on:
-      journal-postgres:
+      journal-postgres-primary:
         condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
-      ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+      JOURNAL_DB_CONNECTION: Host=journal-postgres-primary;Port=5432;Database=${JOURNAL_POSTGRES_DB:-journaldb};Username=${JOURNAL_POSTGRES_USER:-journaluser};Password=${JOURNAL_POSTGRES_PASSWORD:-journalpass}
+      ConnectionStrings__JournalDatabase: Host=journal-postgres-primary;Port=5432;Database=${JOURNAL_POSTGRES_DB:-journaldb};Username=${JOURNAL_POSTGRES_USER:-journaluser};Password=${JOURNAL_POSTGRES_PASSWORD:-journalpass}
     expose:
       - "8080"
     networks:
@@ -287,32 +607,147 @@ services:
     platform: linux/amd64
     container_name: cpr-journal-service-3
     depends_on:
-      journal-postgres:
+      journal-postgres-primary:
         condition: service_healthy
     environment:
       ASPNETCORE_URLS: http://+:8080
       ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      JOURNAL_DB_CONNECTION: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
-      ConnectionStrings__JournalDatabase: Host=journal-postgres;Port=5432;Database=${JOURNAL_POSTGRES_DB};Username=${JOURNAL_POSTGRES_USER};Password=${JOURNAL_POSTGRES_PASSWORD}
+      JOURNAL_DB_CONNECTION: Host=journal-postgres-primary;Port=5432;Database=${JOURNAL_POSTGRES_DB:-journaldb};Username=${JOURNAL_POSTGRES_USER:-journaluser};Password=${JOURNAL_POSTGRES_PASSWORD:-journalpass}
+      ConnectionStrings__JournalDatabase: Host=journal-postgres-primary;Port=5432;Database=${JOURNAL_POSTGRES_DB:-journaldb};Username=${JOURNAL_POSTGRES_USER:-journaluser};Password=${JOURNAL_POSTGRES_PASSWORD:-journalpass}
     expose:
       - "8080"
     networks:
       - cpr-network
     restart: unless-stopped
 
-  # === SCALED GHOST SERVICE (2 replicas) - NO PLATFORM CONSTRAINT ===
+  # === SCALED INVENTORY SERVICE (3 replicas) - Connect to PRIMARY ===
+  inventory-service-1:
+    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
+    platform: linux/amd64
+    container_name: cpr-inventory-service-1
+    depends_on:
+      inventory-postgres-primary:
+        condition: service_healthy
+      message-broker:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=inventory-postgres-primary;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+      MESSAGE_BROKER_URL: http://message-broker:8002
+      SERVICE_NAME: inventory-service-1
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  inventory-service-2:
+    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
+    platform: linux/amd64
+    container_name: cpr-inventory-service-2
+    depends_on:
+      inventory-postgres-primary:
+        condition: service_healthy
+      message-broker:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=inventory-postgres-primary;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+      MESSAGE_BROKER_URL: http://message-broker:8002
+      SERVICE_NAME: inventory-service-2
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  inventory-service-3:
+    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
+    platform: linux/amd64
+    container_name: cpr-inventory-service-3
+    depends_on:
+      inventory-postgres-primary:
+        condition: service_healthy
+      message-broker:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=inventory-postgres-primary;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
+      MESSAGE_BROKER_URL: http://message-broker:8002
+      SERVICE_NAME: inventory-service-3
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED CHAT SERVICE (3 replicas) - Connect to PRIMARY ===
+  chat-service-1:
+    image: ${CHAT_IMAGE:-renat03/chat-service}
+    platform: linux/amd64
+    container_name: cpr-chat-service-1
+    depends_on:
+      chat-postgres-primary:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=chat-postgres-primary;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  chat-service-2:
+    image: ${CHAT_IMAGE:-renat03/chat-service}
+    platform: linux/amd64
+    container_name: cpr-chat-service-2
+    depends_on:
+      chat-postgres-primary:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=chat-postgres-primary;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  chat-service-3:
+    image: ${CHAT_IMAGE:-renat03/chat-service}
+    platform: linux/amd64
+    container_name: cpr-chat-service-3
+    depends_on:
+      chat-postgres-primary:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_URLS: http://+:8080
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ConnectionStrings__DefaultConnection: Host=chat-postgres-primary;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
+    expose:
+      - "8080"
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
+  # === SCALED GHOST SERVICE (2 replicas) - Connect to PRIMARY ===
   ghost-service-1:
     image: ${GHOST_IMAGE:-sergiudimbitchi/ghost-service-ts}
-    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
     container_name: cpr-ghost-service-1
     depends_on:
-      ghost-postgres:
+      ghost-postgres-primary:
         condition: service_healthy
     environment:
       PORT: "8000"
       NODE_ENV: "production"
       STORAGE_BACKEND: "postgres"
-      DATABASE_URL: "postgres://${GHOST_POSTGRES_USER:-ghostuser}:${GHOST_POSTGRES_PASSWORD:-ghostpass}@ghost-postgres:5432/${GHOST_POSTGRES_DB:-ghostdb}"
+      DATABASE_URL: "postgres://${GHOST_POSTGRES_USER:-ghostuser}:${GHOST_POSTGRES_PASSWORD:-ghostpass}@ghost-postgres-primary:5432/${GHOST_POSTGRES_DB:-ghostdb}"
     expose:
       - "8000"
     networks:
@@ -327,16 +762,15 @@ services:
 
   ghost-service-2:
     image: ${GHOST_IMAGE:-sergiudimbitchi/ghost-service-ts}
-    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
     container_name: cpr-ghost-service-2
     depends_on:
-      ghost-postgres:
+      ghost-postgres-primary:
         condition: service_healthy
     environment:
       PORT: "8000"
       NODE_ENV: "production"
       STORAGE_BACKEND: "postgres"
-      DATABASE_URL: "postgres://${GHOST_POSTGRES_USER:-ghostuser}:${GHOST_POSTGRES_PASSWORD:-ghostpass}@ghost-postgres:5432/${GHOST_POSTGRES_DB:-ghostdb}"
+      DATABASE_URL: "postgres://${GHOST_POSTGRES_USER:-ghostuser}:${GHOST_POSTGRES_PASSWORD:-ghostpass}@ghost-postgres-primary:5432/${GHOST_POSTGRES_DB:-ghostdb}"
     expose:
       - "8000"
     networks:
@@ -355,12 +789,11 @@ services:
     platform: linux/amd64
     container_name: cpr-ghost-ai-service-1
     depends_on:
-      ghost-ai-mongodb:
-        condition: service_healthy
+      - ghost-ai-mongodb-primary
     environment:
       NODE_ENV: production
       PORT: "3002"
-      MONGODB_URI: mongodb://${GHOST_AI_MONGO_USER:-ghostadmin}:${GHOST_AI_MONGO_PASSWORD:-ghostpass123}@ghost-ai-mongodb:27017/${GHOST_AI_MONGO_DB:-ghostai}?authSource=admin
+      MONGODB_URI: mongodb://ghost-ai-mongodb-primary:27017/${GHOST_AI_MONGO_DB:-ghostai}?replicaSet=ghostai-rs
     expose:
       - "3002"
     networks:
@@ -372,12 +805,11 @@ services:
     platform: linux/amd64
     container_name: cpr-ghost-ai-service-2
     depends_on:
-      ghost-ai-mongodb:
-        condition: service_healthy
+      - ghost-ai-mongodb-primary
     environment:
       NODE_ENV: production
       PORT: "3002"
-      MONGODB_URI: mongodb://${GHOST_AI_MONGO_USER:-ghostadmin}:${GHOST_AI_MONGO_PASSWORD:-ghostpass123}@ghost-ai-mongodb:27017/${GHOST_AI_MONGO_DB:-ghostai}?authSource=admin
+      MONGODB_URI: mongodb://ghost-ai-mongodb-primary:27017/${GHOST_AI_MONGO_DB:-ghostai}?replicaSet=ghostai-rs
     expose:
       - "3002"
     networks:
@@ -390,12 +822,11 @@ services:
     platform: linux/amd64
     container_name: cpr-user-management-service-1
     depends_on:
-      user-mongodb:
-        condition: service_healthy
+      - user-mongodb-primary
     environment:
       NODE_ENV: production
       PORT: "3001"
-      MONGODB_URI: mongodb://${USER_MONGO_USER:-admin}:${USER_MONGO_PASSWORD:-admin123}@user-mongodb:27017/${USER_MONGO_DB:-user_management}?authSource=admin
+      MONGODB_URI: mongodb://user-mongodb-primary:27017/${USER_MONGO_DB:-user_management}?replicaSet=user-rs
     expose:
       - "3001"
     networks:
@@ -407,19 +838,18 @@ services:
     platform: linux/amd64
     container_name: cpr-user-management-service-2
     depends_on:
-      user-mongodb:
-        condition: service_healthy
+      - user-mongodb-primary
     environment:
       NODE_ENV: production
       PORT: "3001"
-      MONGODB_URI: mongodb://${USER_MONGO_USER:-admin}:${USER_MONGO_PASSWORD:-admin123}@user-mongodb:27017/${USER_MONGO_DB:-user_management}?authSource=admin
+      MONGODB_URI: mongodb://user-mongodb-primary:27017/${USER_MONGO_DB:-user_management}?replicaSet=user-rs
     expose:
       - "3001"
     networks:
       - cpr-network
     restart: unless-stopped
 
-  # === SCALED LOBBY SERVICE (2 replicas) ===
+  # === LOBBY SERVICE (2 replicas) ===
   lobby-service-1:
     image: ${LOBBY_IMAGE:-doschinescu/lobby-service}
     platform: linux/amd64
@@ -454,7 +884,7 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  # === SCALED MAP SERVICE (2 replicas) ===
+  # === MAP SERVICE (2 replicas) ===
   map-service-1:
     image: ${MAP_IMAGE:-doschinescu/map-service}
     platform: linux/amd64
@@ -489,114 +919,9 @@ services:
       - cpr-network
     restart: unless-stopped
 
-  # === SCALED CHAT SERVICE (3 replicas) ===
-  chat-service-1:
-    image: ${CHAT_IMAGE:-renat03/chat-service}
-    platform: linux/amd64
-    container_name: cpr-chat-service-1
-    depends_on:
-      chat-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__DefaultConnection: Host=chat-postgres;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
-    expose:
-      - "8080"
-    networks:
-      - cpr-network
-    restart: unless-stopped
-
-  chat-service-2:
-    image: ${CHAT_IMAGE:-renat03/chat-service}
-    platform: linux/amd64
-    container_name: cpr-chat-service-2
-    depends_on:
-      chat-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__DefaultConnection: Host=chat-postgres;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
-    expose:
-      - "8080"
-    networks:
-      - cpr-network
-    restart: unless-stopped
-
-  chat-service-3:
-    image: ${CHAT_IMAGE:-renat03/chat-service}
-    platform: linux/amd64
-    container_name: cpr-chat-service-3
-    depends_on:
-      chat-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__DefaultConnection: Host=chat-postgres;Port=5432;Database=${CHAT_POSTGRES_DB:-chatdb};Username=${CHAT_POSTGRES_USER:-chatuser};Password=${CHAT_POSTGRES_PASSWORD:-chatpass}
-    expose:
-      - "8080"
-    networks:
-      - cpr-network
-    restart: unless-stopped
-
-  # === SCALED INVENTORY SERVICE (3 replicas) ===
-  inventory-service-1:
-    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
-    platform: linux/amd64
-    container_name: cpr-inventory-service-1
-    depends_on:
-      inventory-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__DefaultConnection: Host=inventory-postgres;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
-    expose:
-      - "8080"
-    networks:
-      - cpr-network
-    restart: unless-stopped
-
-  inventory-service-2:
-    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
-    platform: linux/amd64
-    container_name: cpr-inventory-service-2
-    depends_on:
-      inventory-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__DefaultConnection: Host=inventory-postgres;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
-    expose:
-      - "8080"
-    networks:
-      - cpr-network
-    restart: unless-stopped
-
-  inventory-service-3:
-    image: ${INVENTORY_IMAGE:-renat03/inventory-service}
-    platform: linux/amd64
-    container_name: cpr-inventory-service-3
-    depends_on:
-      inventory-postgres:
-        condition: service_healthy
-    environment:
-      ASPNETCORE_URLS: http://+:8080
-      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
-      ConnectionStrings__DefaultConnection: Host=inventory-postgres;Port=5432;Database=${INVENTORY_POSTGRES_DB:-inventorydb};Username=${INVENTORY_POSTGRES_USER:-inventoryuser};Password=${INVENTORY_POSTGRES_PASSWORD:-inventorypass}
-    expose:
-      - "8080"
-    networks:
-      - cpr-network
-    restart: unless-stopped
-
-  # === SCALED LOCATION SERVICE (2 replicas) - NO PLATFORM CONSTRAINT ===
+  # === LOCATION SERVICE (2 replicas) ===
   location-service-1:
     image: ${LOCATION_IMAGE:-sergiudimbitchi/location-service}
-    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
     container_name: cpr-location-service-1
     environment:
       PORT: "8001"
@@ -609,7 +934,6 @@ services:
 
   location-service-2:
     image: ${LOCATION_IMAGE:-sergiudimbitchi/location-service}
-    # platform: linux/amd64  # ❌ REMOVED - Let Docker handle it
     container_name: cpr-location-service-2
     environment:
       PORT: "8001"
@@ -629,6 +953,9 @@ services:
     container_name: cpr-gateway-service
     depends_on:
       - service-discovery
+      - redis-cache-1
+      - redis-cache-2
+      - redis-cache-3
       - shop-service-1
       - journal-service-1
       - ghost-service-1
@@ -641,6 +968,7 @@ services:
       - location-service-1
     environment:
       PORT: "8080"
+      MESSAGE_BROKER_URL: "http://message-broker:8002"
       SHOP_BASE_URL: "http://shop-service-1:8080"
       JOURNAL_BASE_URL: "http://journal-service-1:8080"
       GHOST_BASE_URL: "http://ghost-service-1:8000"
@@ -652,8 +980,15 @@ services:
       INVENTORY_BASE_URL: "http://inventory-service-1:8080"
       LOCATION_BASE_URL: "http://location-service-1:8001"
       SERVICE_DISCOVERY_URL: "http://service-discovery:8000"
+      REDIS_NODES: "redis-cache-1:6379,redis-cache-2:6379,redis-cache-3:6379"
+      REDIS_URL: "redis://redis-cache-1:6379"
+      CONSISTENT_HASH_REPLICAS: "150"
+      CACHE_ENABLED: "true"
+      CACHE_DEFAULT_TTL: "300"
     ports:
       - "${GATEWAY_PORT:-8081}:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
       - cpr-network
     restart: unless-stopped
@@ -682,8 +1017,7 @@ services:
       timeout: 10s
       retries: 3
 
-# === MESSAGE BROKER ===
-
+  # === MESSAGE BROKER ===
   message-broker:
     build:
       context: ./microservices/message-broker
@@ -705,16 +1039,128 @@ services:
       start_period: 10s
     restart: unless-stopped
 
+  # ============================================
+  # REDIS CACHE CLUSTER (for Consistent Hashing)
+  # ============================================
+  redis-cache-1:
+    image: redis:7-alpine
+    container_name: cpr-redis-cache-1
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6382:6379"
+    volumes:
+      - cpr_redis_cache_1:/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  redis-cache-2:
+    image: redis:7-alpine
+    container_name: cpr-redis-cache-2
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6383:6379"
+    volumes:
+      - cpr_redis_cache_2:/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  redis-cache-3:
+    image: redis:7-alpine
+    container_name: cpr-redis-cache-3
+    command: redis-server --maxmemory 128mb --maxmemory-policy allkeys-lru --appendonly yes
+    ports:
+      - "6384:6379"
+    volumes:
+      - cpr_redis_cache_3:/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    restart: unless-stopped
+
+  # ============================================
+  # DATA WAREHOUSE & ETL
+  # ============================================
+  
+  data-warehouse:
+    image: postgres:16
+    container_name: cpr-data-warehouse
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: data_warehouse
+      POSTGRES_USER: dw_user
+      POSTGRES_PASSWORD: dw_pass
+    volumes:
+      - cpr_data_warehouse:/var/lib/postgresql/data
+    networks:
+      - cpr-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dw_user -d data_warehouse"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  etl-service:
+    build:
+      context: ./microservices/etl-service
+      dockerfile: Dockerfile
+    container_name: cpr-etl-service
+    depends_on:
+      data-warehouse:
+        condition: service_healthy
+      shop-postgres-primary:
+        condition: service_healthy
+      user-mongodb-primary:
+        condition: service_healthy
+    environment:
+      DW_URI: postgresql://dw_user:dw_pass@data-warehouse:5432/data_warehouse
+      SHOP_DB_URI: postgresql://shopuser:shoppass@shop-postgres-primary:5432/shopdb
+      USER_MONGO_URI: mongodb://user-mongodb-primary:27017/user_management
+    networks:
+      - cpr-network
+    restart: unless-stopped
+
 volumes:
-  cpr_shop_pgdata:
-  cpr_journal_pgdata:
-  cpr_ghost_pgdata:
-  cpr_chat_pgdata:
-  cpr_inventory_pgdata:
+  # PostgreSQL primary/replica volumes
+  cpr_shop_primary_pgdata:
+  cpr_shop_replica_pgdata:
+  cpr_journal_primary_pgdata:
+  cpr_journal_replica_pgdata:
+  cpr_inventory_primary_pgdata:
+  cpr_inventory_replica_pgdata:
+  cpr_chat_primary_pgdata:
+  cpr_chat_replica_pgdata:
+  cpr_ghost_primary_pgdata:
+  cpr_ghost_replica_pgdata:
+  # MongoDB replica set volumes
+  cpr_user_mongodb_primary:
+  cpr_user_mongodb_secondary:
+  cpr_ghost_ai_mongodb_primary:
+  cpr_ghost_ai_mongodb_secondary:
+  # Non-replicated databases
   cpr_lobby_mongodb:
   cpr_map_mongodb:
-  cpr_user_mongodb:
-  cpr_ghost_ai_mongodb:
+  # Redis cache
+  cpr_redis_cache_1:
+  cpr_redis_cache_2:
+  cpr_redis_cache_3:
+  # Data warehouse
+  cpr_data_warehouse:
 
 networks:
   cpr-network:

@@ -1,0 +1,263 @@
+{
+    "info": {
+        "name": "Gateway Cache Tests (Lab 2 Grade 7)",
+        "description": "Test Redis caching for commonly accessed GET requests",
+        "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+    },
+    "item": [
+        {
+            "name": "1. Cache Health",
+            "item": [
+                {
+                    "name": "Check Cache Health",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Cache is healthy', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    var json = pm.response.json();",
+                        "    pm.expect(json.status).to.equal('healthy');",
+                        "    console.log('✅ Cache latency: ' + json.latency_ms + 'ms');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/cache/health"}
+                },
+                {
+                    "name": "Get Cache Stats",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Stats available', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    var json = pm.response.json();",
+                        "    pm.expect(json.enabled).to.be.true;",
+                        "    console.log('📊 Hit rate: ' + json.stats.hit_rate_percent + '%');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/cache/stats"}
+                }
+            ]
+        },
+        {
+            "name": "2. Shop Service Caching",
+            "item": [
+                {
+                    "name": "GET /shop/items (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Cache MISS on first request', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "    console.log('❌ Cache MISS (expected)');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/shop/items"}
+                },
+                {
+                    "name": "GET /shop/items (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Cache HIT on second request', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "    console.log('🎯 Cache HIT!');",
+                        "    console.log('TTL: ' + pm.response.headers.get('X-Cache-TTL') + 's');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/shop/items"}
+                },
+                {
+                    "name": "GET /shop/items/{id} (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Single item - Cache MISS', function() {",
+                        "    if (pm.response.code === 200) {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "    }",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/shop/items/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+                },
+                {
+                    "name": "GET /shop/items/{id} (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Single item - Cache HIT', function() {",
+                        "    if (pm.response.code === 200) {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "        console.log('🎯 Single item cache HIT!');",
+                        "    }",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/shop/items/aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"}
+                }
+            ]
+        },
+        {
+            "name": "3. Ghost Service Caching",
+            "item": [
+                {
+                    "name": "GET /ghosts/types (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Ghost types - Cache MISS', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/ghosts/types"}
+                },
+                {
+                    "name": "GET /ghosts/types (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Ghost types - Cache HIT', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "    console.log('🎯 Ghost types cached for 30 min!');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/ghosts/types"}
+                },
+                {
+                    "name": "GET /ghosts/symptoms (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Symptoms - Cache MISS', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/ghosts/symptoms"}
+                },
+                {
+                    "name": "GET /ghosts/symptoms (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Symptoms - Cache HIT', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/ghosts/symptoms"}
+                }
+            ]
+        },
+        {
+            "name": "4. User Service Caching",
+            "item": [
+                {
+                    "name": "GET /users/{id}/profile (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "if (pm.response.code === 200) {",
+                        "    pm.test('Profile - Cache MISS', function() {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "    });",
+                        "}"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/users/{{test_user_id}}/profile"}
+                },
+                {
+                    "name": "GET /users/{id}/profile (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "if (pm.response.code === 200) {",
+                        "    pm.test('Profile - Cache HIT', function() {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "        console.log('🎯 User profile cached for 5 min!');",
+                        "    });",
+                        "}"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/users/{{test_user_id}}/profile"}
+                },
+                {
+                    "name": "GET /users/{id}/friends (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "if (pm.response.code === 200) {",
+                        "    pm.test('Friends - Cache MISS', function() {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "    });",
+                        "}"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/users/{{test_user_id}}/friends"}
+                },
+                {
+                    "name": "GET /users/{id}/friends (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "if (pm.response.code === 200) {",
+                        "    pm.test('Friends - Cache HIT', function() {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "    });",
+                        "}"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/users/{{test_user_id}}/friends"}
+                }
+            ]
+        },
+        {
+            "name": "5. Inventory Service Caching",
+            "item": [
+                {
+                    "name": "GET /api/inventory (1st - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "if (pm.response.code === 200) {",
+                        "    pm.test('Inventory - Cache MISS', function() {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "    });",
+                        "}"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/api/inventory"}
+                },
+                {
+                    "name": "GET /api/inventory (2nd - HIT)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "if (pm.response.code === 200) {",
+                        "    pm.test('Inventory - Cache HIT', function() {",
+                        "        pm.expect(pm.response.headers.get('X-Cache')).to.equal('HIT');",
+                        "        console.log('🎯 Inventory cached for 2 min!');",
+                        "    });",
+                        "}"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/api/inventory"}
+                }
+            ]
+        },
+        {
+            "name": "6. Cache Invalidation",
+            "item": [
+                {
+                    "name": "Invalidate Shop Cache",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Cache invalidated', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    console.log('Deleted: ' + pm.response.json().deleted_keys + ' keys');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "DELETE", "url": "{{gateway_url}}/cache/invalidate/shop"}
+                },
+                {
+                    "name": "GET /shop/items (After Invalidation - MISS)",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Cache MISS after invalidation', function() {",
+                        "    pm.response.to.have.status(200);",
+                        "    pm.expect(pm.response.headers.get('X-Cache')).to.equal('MISS');",
+                        "    console.log('✅ Cache properly invalidated');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/shop/items"}
+                }
+            ]
+        },
+        {
+            "name": "7. Final Stats",
+            "item": [
+                {
+                    "name": "Get Final Cache Stats",
+                    "event": [{"listen": "test", "script": {"exec": [
+                        "pm.test('Cache has activity', function() {",
+                        "    var json = pm.response.json();",
+                        "    pm.expect(json.stats.hits).to.be.above(0);",
+                        "    pm.expect(json.stats.misses).to.be.above(0);",
+                        "    console.log('📊 Final Stats:');",
+                        "    console.log('  Hits: ' + json.stats.hits);",
+                        "    console.log('  Misses: ' + json.stats.misses);",
+                        "    console.log('  Hit Rate: ' + json.stats.hit_rate_percent + '%');",
+                        "});"
+                    ]}}],
+                    "request": {"method": "GET", "url": "{{gateway_url}}/cache/stats"}
+                }
+            ]
+        }
+    ],
+    "variable": [
+        {"key": "gateway_url", "value": "http://localhost:8081"},
+        {"key": "test_user_id", "value": "00000000-0000-0000-0000-000000000001"}
+    ]
+}
